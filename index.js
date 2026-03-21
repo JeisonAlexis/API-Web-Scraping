@@ -14,7 +14,7 @@ app.use(express.json());
 app.get("/oferta-unipamplona", async (req, res) => {
   try {
     const { data: html } = await axios.get(
-      "view-source:https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/21042014/ofertaacademica_2016.jsp",
+      "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/21042014/ofertaacademica_2016.jsp",
       {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; Botpress/1.0)",
