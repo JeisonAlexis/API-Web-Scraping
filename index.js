@@ -154,6 +154,42 @@ app.get("/oferta-pregrado-distancia-unipamplona", async (req, res) => {
   }
 });
 
+
+app.get("/oferta-posgrados-unipamplona", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/postgrados/01022011/oferta_academica_posgrados.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    });
+
+    const $ = cheerio.load(html);
+
+    let imagen = $("#pagcontenido img").first().attr("src");
+
+    if (imagen && imagen.startsWith("/")) {
+      imagen = "https://www.unipamplona.edu.co" + imagen;
+    }
+
+    if (!imagen) {
+      throw new Error("No se encontró la imagen de posgrados");
+    }
+
+    res.json({
+      fuente: urlFuente,
+      imagen
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping posgrados:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la oferta de posgrados",
+    });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error("❌ Error no manejado:", err);
   res.status(500).json({
