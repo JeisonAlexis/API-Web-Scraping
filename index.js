@@ -14,7 +14,7 @@ app.use(express.json());
 app.get("/oferta-unipamplona", async (req, res) => {
   try {
     const { data: html } = await axios.get(
-      "URL_DE_LA_PAGINA", // pon aquí la URL real
+      "view-source:https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/21042014/ofertaacademica_2016.jsp",
       {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; Botpress/1.0)",
@@ -56,7 +56,6 @@ app.get("/oferta-unipamplona", async (req, res) => {
           });
         });
 
-      // evitar meter el header (FACULTADES / PROGRAMAS)
       if (facultad && programas.length > 0) {
         resultado.push({
           facultad,
@@ -83,7 +82,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Console al Iniciar servidor
+
+
 app.listen(port, () => {
   console.log(`\nServidor iniciado correctamente`);
   console.log(`Puerto: ${port}`);
