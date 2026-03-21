@@ -11,19 +11,18 @@ app.use(cors());
 app.use(express.json());
 
 
-app.get("/oferta-unipamplona", async (req, res) => {
+app.get("/oferta-pregrado-presencial-unipamplona", async (req, res) => {
   try {
     const { data: html } = await axios.get(
       "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/21042014/ofertaacademica_2016.jsp",
       {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; Botpress/1.0)",
+          "User-Agent": "Mozilla/5.0",
         },
       }
     );
 
     const $ = cheerio.load(html);
-
     const resultado = [];
 
     $(".table-row-inscripciones").each((i, el) => {
@@ -42,17 +41,30 @@ app.get("/oferta-unipamplona", async (req, res) => {
           const nombre = $(item)
             .find(".link-oferta")
             .text()
+            .replace(/\s+/g, " ")
             .trim();
 
-          const info = $(item)
+          let info = $(item)
             .find(".info-oferta")
             .text()
             .replace(/\s+/g, " ")
             .trim();
 
+          // 🔥 quitar [COD SNIES ...]
+          info = info.replace(/\[.*?\]/g, "").trim();
+
+          // 🔗 obtener URL
+          let url = $(item).find(".link-oferta").attr("href");
+
+          // convertir a URL absoluta si es relativa
+          if (url && url.startsWith("/")) {
+            url = "https://www.unipamplona.edu.co" + url;
+          }
+
           programas.push({
             nombre,
             info,
+            url,
           });
         });
 
@@ -72,7 +84,6 @@ app.get("/oferta-unipamplona", async (req, res) => {
     });
   }
 });
-
 
 app.use((err, req, res, next) => {
   console.error("❌ Error no manejado:", err);
