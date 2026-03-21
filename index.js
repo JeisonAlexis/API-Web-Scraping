@@ -10,18 +10,6 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ==================== RUTAS ====================
-
-// Ruta raíz
-app.get("/", (req, res) => {
-  res.json({
-    mensaje: "¡Hola desde mi servicio de Render!",
-    endpoints_disponibles: [
-      { metodo: "GET", ruta: "/recuperar-cuenta-sofia", descripcion: "Obtiene información sobre recuperación de contraseña en SOFIA Plus" },
-      { metodo: "GET", ruta: "/oferta-academica-unipamplona", descripcion: "Obtiene la oferta académica de pregrado de la Universidad de Pamplona" }
-    ]
-  });
-});
 
 // Endpoint 1: SOFIA Plus - Recuperar contraseña
 app.get("/recuperar-cuenta-sofia", async (req, res) => {
@@ -101,7 +89,7 @@ app.get("/oferta-academica-unipamplona", async (req, res) => {
   
   try {
     const { data: html } = await axios.get(
-      "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/04112009/oferta_academica.jsp",
+      "hview-source:https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_presencial/21042014/ofertaacademica_2016.jsp",
       {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
