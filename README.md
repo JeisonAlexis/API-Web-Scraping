@@ -1,23 +1,21 @@
-# 🤖 Chatbot Administrativo Virtual SENA — Backend Scraping API 🌐
+# 🤖 Chatbot Asistente Administrativo Virtual Para La Universidad de Pamplona — Backend Scraping API 🌐
 
-Backend desarrollado en **Node.js + Express** encargado de realizar **Web Scraping dinámico** sobre páginas oficiales del SENA y plataformas relacionadas como SOFIA Plus, con el objetivo de suministrar información actualizada a un **chatbot asistente administrativo virtual inteligente del SENA**.
+Backend desarrollado en **Node.js + Express** encargado de realizar **Web Scraping dinámico** sobre páginas oficiales de la Universidad de Pamplona, con el objetivo de suministrar información actualizada a un **chatbot asistente administrativo virtual inteligente para la Universidad de Pamplona**.
 
 Este servicio funciona como una capa intermedia que transforma contenido web institucional en datos estructurados JSON listos para consumo por sistemas conversacionales, RAG e interfaces web.
 
-Proyecto desarrollado como parte de la formación **Tecnologo ADSO — Análisis y Desarrollo de Software del SENA**.
+Proyecto desarrollado como parte de la formación **Ingenieria de Sistemas de la Universidad de Pamplona**.
 
 ---
 
 ## 🧠 Funcionalidades Principales
 
-- 📡 Scraping automático desde páginas oficiales del SENA
+- 📡 Scraping automático desde páginas oficiales de la Universidad
 - 🤖 Integración directa con Botpress Cloud
 - 📚 Extracción de preguntas frecuentes institucionales
 - 🎓 Consulta de programas de formación
-- 🏢 Directorios administrativos por centros
-- 🧾 Guías visuales SOFIA Plus
-- 🧪 Información sobre pruebas de selección
-- 🔎 Búsqueda avanzada de programas
+- 🏢 Informacion de Directivos y planta docente de los programas academicos
+- 🧾 Guías visuales oficiales
 - 🌍 API REST consumible desde cualquier frontend
 
 ---
@@ -29,8 +27,6 @@ Proyecto desarrollado como parte de la formación **Tecnologo ADSO — Análisis
 - Express.js
 - Axios
 - Cheerio
-- HTTPS Agent
-- UUID
 - CORS
 - Render (Deploy en la nube)
 - Botpress Cloud (Integración chatbot)
@@ -45,7 +41,7 @@ Chatbot (Botpress)
 ⬇  
 Backend Scraping API  
 ⬇  
-Páginas Oficiales SENA  
+Páginas Oficiales de la Universidad
 ⬇  
 Datos JSON estructurados  
 ⬇  
@@ -106,8 +102,8 @@ http://localhost:3000
 
 **Autor**
 - Jeison Alexis Rodriguez Angarita 🙍‍♂️
-- Proyecto Productivo / Tecnologo ADSO (Analisis y Desarrollo de Software / SENA 👨‍🎓
-- 2025 📅 
+- Sistemas Inteligentes / Ingenieria de Sistemas / Universidad de Pamplona 👨‍🎓
+- 2026 📅 
 
 
 
