@@ -84,7 +84,7 @@ app.get("/oferta-pregrado-presencial-unipamplona", async (req, res) => {
 app.get("/oferta-pregrado-distancia-unipamplona", async (req, res) => {
   try {
     const { data: html } = await axios.get(
-      "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_distancia/23092025/oferta_distancia.jsp",
+      "https://www.unipamplona.edu.co/unipamplona/portalIG/home_11/recursos/general/contenidos_subgeneral/inscripciones_distancia/20052010/oferta_distancia.jsp",
       {
         headers: {
           "User-Agent": "Mozilla/5.0",
