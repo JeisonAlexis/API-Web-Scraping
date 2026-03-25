@@ -194,13 +194,10 @@ app.get("/oferta-posgrados-unipamplona", async (req, res) => {
   }
 });
 
-// Directorio para guardar imágenes
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
-// Dominio base de la API
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api-web-scraping-vi1c.onrender.com';
 
-// Asegurar que el directorio de uploads existe
 async function ensureUploadsDir() {
   try {
     await fs.access(UPLOADS_DIR);
@@ -209,12 +206,10 @@ async function ensureUploadsDir() {
   }
 }
 
-// Función para guardar imagen base64 y retornar URL completa
 async function guardarImagenBase64(base64Data, nombreDocente) {
   if (!base64Data || !base64Data.startsWith('data:image')) return base64Data;
   
   try {
-    // Extraer tipo y datos
     const matches = base64Data.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
     if (!matches) return base64Data;
     
@@ -222,7 +217,6 @@ async function guardarImagenBase64(base64Data, nombreDocente) {
     const base64 = matches[2];
     const buffer = Buffer.from(base64, 'base64');
     
-    // Generar nombre de archivo único basado en el nombre del docente
     const nombreLimpio = nombreDocente
       .replace(/[^a-zA-Z0-9]/g, '_')
       .replace(/_+/g, '_')
@@ -232,10 +226,8 @@ async function guardarImagenBase64(base64Data, nombreDocente) {
     const filename = `${nombreLimpio}_${hash}.${extension}`;
     const filepath = path.join(UPLOADS_DIR, filename);
     
-    // Guardar en disco
     await fs.writeFile(filepath, buffer);
     
-    // Retornar URL completa
     return `${API_BASE_URL}/uploads/${filename}`;
     
   } catch (error) {
@@ -272,7 +264,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       const infoText = $(celdas[0]).text().trim();
       const imgSrc = $(celdas[1]).find("img").attr("src");
 
-      // Extraer nombre - buscar el texto en <strong> o la primera línea
       let nombre = "";
       const strongText = $(celdas[0]).find("strong").first().text().trim();
       if (strongText) {
@@ -291,27 +282,21 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       
       nombre = nombre.replace(/<\/?strong>/g, "").trim();
 
-      // Extraer resolución
       const resolucionMatch = infoText.match(/Resoluci[óo]n\s*(\d+)\s*-\s*([A-Za-z]+\s*\d{4})/i);
       const resolucion = resolucionMatch ? resolucionMatch[0] : "";
 
-      // Extraer título académico
       const tituloMatch = infoText.match(/(Ph\.D\.|M\.Sc\.|Esp\.|Ing\.)\s*\.?\s*([^<]+)/i);
       const titulo = tituloMatch ? tituloMatch[0] : "";
 
-      // Extraer cargo - buscar patrón "Profesor X - Acuerdo"
       const cargoMatch = infoText.match(/Profesor\s*([A-Za-z\s]+)\s*-\s*Acuerdo/i);
       const cargo = cargoMatch ? `Profesor ${cargoMatch[1].trim()}` : "";
 
-      // Extraer CvLAC - buscar enlace dentro del texto
       let cvlac = "";
-      // Buscar cualquier href que contenga scienti.minciencias.gov.co
       const cvlacRegex = /https?:\/\/scienti\.minciencias\.gov\.co\/[^\s"']+/i;
       const cvlacMatch = infoText.match(cvlacRegex);
       if (cvlacMatch) {
         cvlac = cvlacMatch[0];
       }
-      // Si no se encontró con la regex, buscar en el HTML original
       if (!cvlac) {
         const htmlContent = $(celdas[0]).html();
         const htmlCvlacMatch = htmlContent.match(/href="(https?:\/\/scienti\.minciencias\.gov\.co\/[^"]+)"/i);
@@ -320,18 +305,14 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
         }
       }
 
-      // Extraer email
       const emailMatch = infoText.match(/Contacto:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
       const email = emailMatch ? emailMatch[1] : "";
 
-      // Extraer campus
       const campusMatch = infoText.match(/Campus:\s*([A-Za-z\s]+)/i);
       const campus = campusMatch ? campusMatch[1].trim() : "";
 
-      // Procesar imagen - convertir base64 a archivo si es necesario
       let imagen = imgSrc || "";
       if (imagen && imagen.startsWith("data:image")) {
-        // Convertir base64 a archivo y obtener URL completa
         imagen = await guardarImagenBase64(imagen, nombre || nombreDocenteParaImagen || 'docente');
       } else if (imagen && imagen.startsWith("/")) {
         imagen = "https://www.unipamplona.edu.co" + imagen;
@@ -353,7 +334,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
     const contenido = $("#texto");
 
-    // Extraer Docentes Tiempo Completo
     const tiempoCompletoRows = contenido.find("table").first().find("tbody tr");
     for (const row of tiempoCompletoRows) {
       const docente = await extraerDocente(row, 'tiempo_completo');
@@ -362,7 +342,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       }
     }
 
-    // Extraer Docentes Tiempo Completo Ocasional y Cátedra
     const headers = contenido.find("h1");
     let ocasionalTable = null;
     
@@ -384,7 +363,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       }
     }
 
-    // Extraer Cátedras del Programa
     let catedraProgramaList = [];
     headers.each((i, header) => {
       const headerText = $(header).text();
@@ -402,7 +380,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
     docentes.catedraPrograma = catedraProgramaList;
 
-    // Extraer Cátedras de Servicio
     let catedraServicioList = [];
     headers.each((i, header) => {
       const headerText = $(header).text();
@@ -419,7 +396,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       }
     });
 
-    // También buscar "Ocasionales Cátedra de Servicio - Pamplona"
     headers.each((i, header) => {
       const headerText = $(header).text();
       if (headerText.includes("Ocasionales Cátedra de Servicio - Pamplona")) {
@@ -448,7 +424,6 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
   }
 });
 
-// Servir archivos estáticos para las imágenes guardadas
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
