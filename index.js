@@ -197,6 +197,9 @@ app.get("/oferta-posgrados-unipamplona", async (req, res) => {
 // Directorio para guardar imágenes
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 
+// Dominio base de la API
+const API_BASE_URL = process.env.API_BASE_URL || 'https://api-web-scraping-vi1c.onrender.com';
+
 // Asegurar que el directorio de uploads existe
 async function ensureUploadsDir() {
   try {
@@ -206,7 +209,7 @@ async function ensureUploadsDir() {
   }
 }
 
-// Función para guardar imagen base64 y retornar URL
+// Función para guardar imagen base64 y retornar URL completa
 async function guardarImagenBase64(base64Data, nombreDocente) {
   if (!base64Data || !base64Data.startsWith('data:image')) return base64Data;
   
@@ -222,6 +225,8 @@ async function guardarImagenBase64(base64Data, nombreDocente) {
     // Generar nombre de archivo único basado en el nombre del docente
     const nombreLimpio = nombreDocente
       .replace(/[^a-zA-Z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
       .substring(0, 50);
     const hash = crypto.createHash('md5').update(base64Data).digest('hex').substring(0, 8);
     const filename = `${nombreLimpio}_${hash}.${extension}`;
@@ -230,8 +235,8 @@ async function guardarImagenBase64(base64Data, nombreDocente) {
     // Guardar en disco
     await fs.writeFile(filepath, buffer);
     
-    // Retornar URL accesible (ajustar según tu configuración de servidor)
-    return `/uploads/${filename}`;
+    // Retornar URL completa
+    return `${API_BASE_URL}/uploads/${filename}`;
     
   } catch (error) {
     console.error('Error al guardar imagen base64:', error.message);
@@ -326,7 +331,7 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       // Procesar imagen - convertir base64 a archivo si es necesario
       let imagen = imgSrc || "";
       if (imagen && imagen.startsWith("data:image")) {
-        // Convertir base64 a archivo
+        // Convertir base64 a archivo y obtener URL completa
         imagen = await guardarImagenBase64(imagen, nombre || nombreDocenteParaImagen || 'docente');
       } else if (imagen && imagen.startsWith("/")) {
         imagen = "https://www.unipamplona.edu.co" + imagen;
