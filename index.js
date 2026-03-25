@@ -2,6 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
 const cheerio = require("cheerio");
+const fs = require('fs').promises;
+const path = require('path');
+const crypto = require('crypto');
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -190,8 +194,55 @@ app.get("/oferta-posgrados-unipamplona", async (req, res) => {
   }
 });
 
+// Directorio para guardar imágenes
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// Asegurar que el directorio de uploads existe
+async function ensureUploadsDir() {
+  try {
+    await fs.access(UPLOADS_DIR);
+  } catch {
+    await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  }
+}
+
+// Función para guardar imagen base64 y retornar URL
+async function guardarImagenBase64(base64Data, nombreDocente) {
+  if (!base64Data || !base64Data.startsWith('data:image')) return base64Data;
+  
+  try {
+    // Extraer tipo y datos
+    const matches = base64Data.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+    if (!matches) return base64Data;
+    
+    const extension = matches[1];
+    const base64 = matches[2];
+    const buffer = Buffer.from(base64, 'base64');
+    
+    // Generar nombre de archivo único basado en el nombre del docente
+    const nombreLimpio = nombreDocente
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .substring(0, 50);
+    const hash = crypto.createHash('md5').update(base64Data).digest('hex').substring(0, 8);
+    const filename = `${nombreLimpio}_${hash}.${extension}`;
+    const filepath = path.join(UPLOADS_DIR, filename);
+    
+    // Guardar en disco
+    await fs.writeFile(filepath, buffer);
+    
+    // Retornar URL accesible (ajustar según tu configuración de servidor)
+    return `/uploads/${filename}`;
+    
+  } catch (error) {
+    console.error('Error al guardar imagen base64:', error.message);
+    return base64Data;
+  }
+}
+
 app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
   try {
+    await ensureUploadsDir();
+    
     const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/07072024/04_docentes_pamplona.jsp";
 
     const { data: html } = await axios.get(urlFuente, {
@@ -209,43 +260,78 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       catedraPrograma: []
     };
 
-    const extraerDocente = (row) => {
+    const extraerDocente = async (row, nombreDocenteParaImagen) => {
       const celdas = $(row).find("td");
       if (celdas.length < 2) return null;
 
       const infoText = $(celdas[0]).text().trim();
       const imgSrc = $(celdas[1]).find("img").attr("src");
 
-      const nombreMatch = infoText.match(/(?:Ph\.D\.|M\.Sc\.|Esp\.|Ing\.)?\s*(?:<strong>)?([^<]+)/);
-      let nombre = nombreMatch ? nombreMatch[1].trim() : "";
+      // Extraer nombre - buscar el texto en <strong> o la primera línea
+      let nombre = "";
+      const strongText = $(celdas[0]).find("strong").first().text().trim();
+      if (strongText) {
+        nombre = strongText;
+      } else {
+        const lines = infoText.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.includes('Resolución') && !trimmed.includes('Profesor') && 
+              !trimmed.includes('Registro') && !trimmed.includes('Contacto') && !trimmed.includes('Campus')) {
+            nombre = trimmed;
+            break;
+          }
+        }
+      }
       
       nombre = nombre.replace(/<\/?strong>/g, "").trim();
 
+      // Extraer resolución
       const resolucionMatch = infoText.match(/Resoluci[óo]n\s*(\d+)\s*-\s*([A-Za-z]+\s*\d{4})/i);
       const resolucion = resolucionMatch ? resolucionMatch[0] : "";
 
-      const tituloMatch = infoText.match(/(Ph\.D\.|M\.Sc\.|Esp\.|Ing\.)\s*\.?\s*([^<]+)/);
+      // Extraer título académico
+      const tituloMatch = infoText.match(/(Ph\.D\.|M\.Sc\.|Esp\.|Ing\.)\s*\.?\s*([^<]+)/i);
       const titulo = tituloMatch ? tituloMatch[0] : "";
 
+      // Extraer cargo - buscar patrón "Profesor X - Acuerdo"
       const cargoMatch = infoText.match(/Profesor\s*([A-Za-z\s]+)\s*-\s*Acuerdo/i);
       const cargo = cargoMatch ? `Profesor ${cargoMatch[1].trim()}` : "";
 
-      const cvlacMatch = infoText.match(/Registro CvLAC\s*\[\s*<a\s+href="([^"]+)"[^>]*>Ir al registro<\/a>\s*\]/i);
-      const cvlac = cvlacMatch ? cvlacMatch[1] : "";
+      // Extraer CvLAC - buscar enlace dentro del texto
+      let cvlac = "";
+      // Buscar cualquier href que contenga scienti.minciencias.gov.co
+      const cvlacRegex = /https?:\/\/scienti\.minciencias\.gov\.co\/[^\s"']+/i;
+      const cvlacMatch = infoText.match(cvlacRegex);
+      if (cvlacMatch) {
+        cvlac = cvlacMatch[0];
+      }
+      // Si no se encontró con la regex, buscar en el HTML original
+      if (!cvlac) {
+        const htmlContent = $(celdas[0]).html();
+        const htmlCvlacMatch = htmlContent.match(/href="(https?:\/\/scienti\.minciencias\.gov\.co\/[^"]+)"/i);
+        if (htmlCvlacMatch) {
+          cvlac = htmlCvlacMatch[1];
+        }
+      }
 
+      // Extraer email
       const emailMatch = infoText.match(/Contacto:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
       const email = emailMatch ? emailMatch[1] : "";
 
+      // Extraer campus
       const campusMatch = infoText.match(/Campus:\s*([A-Za-z\s]+)/i);
       const campus = campusMatch ? campusMatch[1].trim() : "";
 
+      // Procesar imagen - convertir base64 a archivo si es necesario
       let imagen = imgSrc || "";
-      if (imagen && imagen.startsWith("/")) {
+      if (imagen && imagen.startsWith("data:image")) {
+        // Convertir base64 a archivo
+        imagen = await guardarImagenBase64(imagen, nombre || nombreDocenteParaImagen || 'docente');
+      } else if (imagen && imagen.startsWith("/")) {
         imagen = "https://www.unipamplona.edu.co" + imagen;
       } else if (imagen && !imagen.startsWith("http")) {
         imagen = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/imagenes/" + imagen;
-      } else if (imagen && imagen.startsWith("data:image")) {
-        imagen = imagen; 
       }
 
       return {
@@ -262,14 +348,16 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
     const contenido = $("#texto");
 
+    // Extraer Docentes Tiempo Completo
     const tiempoCompletoRows = contenido.find("table").first().find("tbody tr");
-    tiempoCompletoRows.each((i, row) => {
-      const docente = extraerDocente(row);
+    for (const row of tiempoCompletoRows) {
+      const docente = await extraerDocente(row, 'tiempo_completo');
       if (docente && docente.nombre) {
         docentes.tiempoCompleto.push(docente);
       }
-    });
+    }
 
+    // Extraer Docentes Tiempo Completo Ocasional y Cátedra
     const headers = contenido.find("h1");
     let ocasionalTable = null;
     
@@ -277,20 +365,21 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       const headerText = $(header).text();
       if (headerText.includes("Docentes Tiempo Completo Ocasional y Cátedra")) {
         ocasionalTable = $(header).next("table");
-        return false; // break
+        return false;
       }
     });
 
     if (ocasionalTable && ocasionalTable.length) {
       const ocasionalRows = ocasionalTable.find("tbody tr");
-      ocasionalRows.each((i, row) => {
-        const docente = extraerDocente(row);
+      for (const row of ocasionalRows) {
+        const docente = await extraerDocente(row, 'ocasional');
         if (docente && docente.nombre) {
           docentes.tiempoCompletoOcasionalCatedra.push(docente);
         }
-      });
+      }
     }
 
+    // Extraer Cátedras del Programa
     let catedraProgramaList = [];
     headers.each((i, header) => {
       const headerText = $(header).text();
@@ -308,6 +397,7 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
     docentes.catedraPrograma = catedraProgramaList;
 
+    // Extraer Cátedras de Servicio
     let catedraServicioList = [];
     headers.each((i, header) => {
       const headerText = $(header).text();
@@ -324,24 +414,20 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       }
     });
 
-    docentes.catedraServicio = catedraServicioList;
-
-    let ocasionalServicioList = [];
+    // También buscar "Ocasionales Cátedra de Servicio - Pamplona"
     headers.each((i, header) => {
       const headerText = $(header).text();
       if (headerText.includes("Ocasionales Cátedra de Servicio - Pamplona")) {
         const lista = $(header).next("ol");
         if (lista.length) {
           lista.find("li").each((j, li) => {
-            ocasionalServicioList.push($(li).text().trim());
+            catedraServicioList.push($(li).text().trim());
           });
         }
       }
     });
 
-    if (ocasionalServicioList.length) {
-      docentes.catedraServicio = [...new Set([...docentes.catedraServicio, ...ocasionalServicioList])];
-    }
+    docentes.catedraServicio = [...new Set(catedraServicioList)];
 
     res.json({
       fuente: urlFuente,
@@ -356,6 +442,9 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
     });
   }
 });
+
+// Servir archivos estáticos para las imágenes guardadas
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
   console.error("❌ Error no manejado:", err);
