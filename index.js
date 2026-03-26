@@ -506,8 +506,12 @@ app.get("/docentes-ingsistemas-villa", async (req, res) => {
         email = emailDirectMatch ? emailDirectMatch[1] : "";
       }
 
+      let campus = "";
       const campusMatch = infoText.match(/Campus:\s*([A-Za-z\s]+)/i);
-      const campus = campusMatch ? campusMatch[1].trim() : "";
+      if (campusMatch) {
+        campus = campusMatch[1].trim();
+        campus = campus.replace(/\s*Hoja de Vida.*$/i, "").replace(/\s*Hoja de vida.*$/i, "").trim();
+      }
 
       let hojaVida = "";
       const hojaVidaMatch = $(celdas[0]).find("a[href*='hoja_vida']").attr("href");
