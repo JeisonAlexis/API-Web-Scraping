@@ -590,6 +590,79 @@ app.get("/docentes-ingsistemas-villa", async (req, res) => {
   }
 });
 
+app.get("/programas-acreditados", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_1/recursos/acreditacion_institucional/02112021/programas_acreditados.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+
+    const programas = [];
+
+    
+    $(".programaacreditado").each((i, elem) => {
+      const $programa = $(elem);
+      
+      
+      let imagen = "";
+      const imgSrc = $programa.find("img").attr("src");
+      if (imgSrc) {
+        if (imgSrc.startsWith("/")) {
+          imagen = "https://www.unipamplona.edu.co" + imgSrc;
+        } else {
+          imagen = imgSrc;
+        }
+      }
+
+      
+      const titulo = $programa.find(".programaacreditado_titu").text().trim();
+
+      
+      let resolucion = "";
+      const textoCompleto = $programa.find("p").last().text().trim();
+      
+      
+      const resolucionMatch = textoCompleto.match(/(Resoluci[óo]n\s*N[°º]\s*\d+\s+del\s+\d+\s+de\s+[a-zA-Z]+\s+de\s+\d{4}\s+por\s+un\s+t[eé]rmino\s+de\s+\d+\s+años\.)/i);
+      if (resolucionMatch) {
+        resolucion = resolucionMatch[1];
+      } else {
+        
+        const resolucionAltMatch = textoCompleto.match(/(Resoluci[óo]n\s*N[°º]\s*\d+\s+del\s+\d+\s+de\s+[a-zA-Z]+\s+de\s+\d{4}[^.]*\.)/i);
+        if (resolucionAltMatch) {
+          resolucion = resolucionAltMatch[1];
+        }
+      }
+
+      if (titulo) {
+        programas.push({
+          id: i + 1,
+          titulo: titulo,
+          resolucion: resolucion || textoCompleto,
+          imagen: imagen,
+          url: urlFuente
+        });
+      }
+    });
+
+    res.json({
+      fuente: urlFuente,
+      totalProgramas: programas.length,
+      programas: programas
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping programas acreditados:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de programas acreditados",
+      mensaje: error.message
+    });
+  }
+});
 
 app.use('/uploads', express.static(UPLOADS_DIR));
 
