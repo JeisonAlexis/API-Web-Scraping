@@ -264,8 +264,8 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       const infoText = $(celdas[0]).text().trim();
       const imgSrc = $(celdas[1]).find("img").attr("src");
 
-      let nombre = "";
-      const strongText = $(celdas[0]).find("strong").first().text().trim();
+      //let nombre = "";
+      //const strongText = $(celdas[0]).find("strong").first().text().trim();
       if (strongText) {
         nombre = strongText;
       } else {
