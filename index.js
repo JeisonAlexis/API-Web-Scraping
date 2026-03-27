@@ -239,13 +239,11 @@ async function guardarImagenBase64(base64Data, nombreDocente) {
 app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
   try {
     await ensureUploadsDir();
-    
+
     const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/07072024/04_docentes_pamplona.jsp";
 
     const { data: html } = await axios.get(urlFuente, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-      },
+      headers: { "User-Agent": "Mozilla/5.0" },
     });
 
     const $ = cheerio.load(html);
@@ -257,30 +255,32 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       catedraPrograma: []
     };
 
-    const extraerDocente = async (row, nombreDocenteParaImagen) => {
+    const extraerDocente = async (row, fallbackNombre = 'docente') => {
       const celdas = $(row).find("td");
       if (celdas.length < 2) return null;
 
       const infoText = $(celdas[0]).text().trim();
       const imgSrc = $(celdas[1]).find("img").attr("src");
 
-      //let nombre = "";
-      //const strongText = $(celdas[0]).find("strong").first().text().trim();
-      if (strongText) {
-        nombre = strongText;
-      } else {
+      let nombre = $(celdas[0]).find("strong").first().text().trim();
+
+      if (!nombre) {
         const lines = infoText.split('\n');
         for (const line of lines) {
           const trimmed = line.trim();
-          if (trimmed && !trimmed.includes('Resolución') && !trimmed.includes('Profesor') && 
-              !trimmed.includes('Registro') && !trimmed.includes('Contacto') && !trimmed.includes('Campus')) {
+          if (
+            trimmed &&
+            !trimmed.includes('Resolución') &&
+            !trimmed.includes('Profesor') &&
+            !trimmed.includes('Registro') &&
+            !trimmed.includes('Contacto') &&
+            !trimmed.includes('Campus')
+          ) {
             nombre = trimmed;
             break;
           }
         }
       }
-      
-      nombre = nombre.replace(/<\/?strong>/g, "").trim();
 
       const resolucionMatch = infoText.match(/Resoluci[óo]n\s*(\d+)\s*-\s*([A-Za-z]+\s*\d{4})/i);
       const resolucion = resolucionMatch ? resolucionMatch[0] : "";
@@ -291,32 +291,22 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       const cargoMatch = infoText.match(/Profesor\s*([A-Za-z\s]+)\s*-\s*Acuerdo/i);
       const cargo = cargoMatch ? `Profesor ${cargoMatch[1].trim()}` : "";
 
-      let cvlac = "";
-      const cvlacRegex = /https?:\/\/scienti\.minciencias\.gov\.co\/[^\s"']+/i;
-      const cvlacMatch = infoText.match(cvlacRegex);
-      if (cvlacMatch) {
-        cvlac = cvlacMatch[0];
-      }
-      if (!cvlac) {
-        const htmlContent = $(celdas[0]).html();
-        const htmlCvlacMatch = htmlContent.match(/href="(https?:\/\/scienti\.minciencias\.gov\.co\/[^"]+)"/i);
-        if (htmlCvlacMatch) {
-          cvlac = htmlCvlacMatch[1];
-        }
-      }
+      const cvlacMatch = infoText.match(/https?:\/\/scienti\.minciencias\.gov\.co\/[^\s"']+/i);
+      const cvlac = cvlacMatch ? cvlacMatch[0] : "";
 
-      const emailMatch = infoText.match(/Contacto:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+      const emailMatch = infoText.match(/Contacto:\s*([^\s]+)/i);
       const email = emailMatch ? emailMatch[1] : "";
 
       const campusMatch = infoText.match(/Campus:\s*([A-Za-z\s]+)/i);
       const campus = campusMatch ? campusMatch[1].trim() : "";
 
       let imagen = imgSrc || "";
+
       if (imagen && imagen.startsWith("data:image")) {
-        imagen = await guardarImagenBase64(imagen, nombre || nombreDocenteParaImagen || 'docente');
+        imagen = await guardarImagenBase64(imagen, nombre || fallbackNombre);
       } else if (imagen && imagen.startsWith("/")) {
         imagen = "https://www.unipamplona.edu.co" + imagen;
-      } else if (imagen && !imagen.startsWith("http")) {
+      } else if (imagen && imagen && !imagen.startsWith("http")) {
         imagen = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/imagenes/" + imagen;
       }
 
@@ -334,6 +324,7 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
     const contenido = $("#texto");
 
+    // Tiempo completo
     const tiempoCompletoRows = contenido.find("table").first().find("tbody tr");
     for (const row of tiempoCompletoRows) {
       const docente = await extraerDocente(row, 'tiempo_completo');
@@ -343,19 +334,18 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
     }
 
     const headers = contenido.find("h1");
+
     let ocasionalTable = null;
-    
     headers.each((i, header) => {
-      const headerText = $(header).text();
-      if (headerText.includes("Docentes Tiempo Completo Ocasional y Cátedra")) {
+      if ($(header).text().includes("Docentes Tiempo Completo Ocasional y Cátedra")) {
         ocasionalTable = $(header).next("table");
         return false;
       }
     });
 
-    if (ocasionalTable && ocasionalTable.length) {
-      const ocasionalRows = ocasionalTable.find("tbody tr");
-      for (const row of ocasionalRows) {
+    if (ocasionalTable) {
+      const rows = ocasionalTable.find("tbody tr");
+      for (const row of rows) {
         const docente = await extraerDocente(row, 'ocasional');
         if (docente && docente.nombre) {
           docentes.tiempoCompletoOcasionalCatedra.push(docente);
@@ -363,54 +353,37 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
       }
     }
 
-    let catedraProgramaList = [];
     headers.each((i, header) => {
-      const headerText = $(header).text();
-      if (headerText.includes("Profesores Hora Cátedra")) {
+      if ($(header).text().includes("Profesores Hora Cátedra")) {
         const nextH3 = $(header).next("h3");
         if (nextH3.text().includes("En el Programa")) {
-          const parrafo = nextH3.next("p");
-          const texto = parrafo.text().trim();
+          const texto = nextH3.next("p").text().trim();
           if (texto && texto !== "No hay cátedras") {
-            catedraProgramaList = texto.split("\n").map(l => l.trim()).filter(l => l);
+            docentes.catedraPrograma = texto.split("\n").map(t => t.trim()).filter(Boolean);
           }
         }
       }
     });
 
-    docentes.catedraPrograma = catedraProgramaList;
+    let listaServicio = [];
 
-    let catedraServicioList = [];
     headers.each((i, header) => {
-      const headerText = $(header).text();
-      if (headerText.includes("Profesores Hora Cátedra")) {
-        const nextH3 = $(header).next("h3");
-        if (nextH3.text().includes("Cátedras de Servicio - Pamplona")) {
-          const lista = nextH3.next("ol");
-          if (lista.length) {
-            lista.find("li").each((j, li) => {
-              catedraServicioList.push($(li).text().trim());
-            });
-          }
-        }
+      if ($(header).text().includes("Cátedras de Servicio")) {
+        $(header).next("ol").find("li").each((j, li) => {
+          listaServicio.push($(li).text().trim());
+        });
       }
     });
 
     headers.each((i, header) => {
-      const headerText = $(header).text();
-      if (headerText.includes("Ocasionales Cátedra de Servicio - Pamplona")) {
-        const lista = $(header).next("ol");
-        if (lista.length) {
-          lista.find("li").each((j, li) => {
-            catedraServicioList.push($(li).text().trim());
-          });
-        }
+      if ($(header).text().includes("Ocasionales Cátedra de Servicio")) {
+        $(header).next("ol").find("li").each((j, li) => {
+          listaServicio.push($(li).text().trim());
+        });
       }
-    });      let nombre = "";
-      const strongText = $(celdas[0]).find("strong").first().text().trim();
+    });
 
-
-    docentes.catedraServicio = [...new Set(catedraServicioList)];
+    docentes.catedraServicio = [...new Set(listaServicio)];
 
     res.json({
       fuente: urlFuente,
@@ -419,196 +392,7 @@ app.get("/docentes-ingsistemas-pamplona", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Error scraping docentes:", error.message);
-    res.status(500).json({
-      error: "No se pudo obtener la información de docentes",
-      mensaje: error.message
-    });
-  }
-});
 
-
-app.get("/docentes-ingsistemas-villa", async (req, res) => {
-  try {
-    await ensureUploadsDir();
-    
-    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/07072024/04_docentes_villa.jsp";
-
-    const { data: html } = await axios.get(urlFuente, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    const $ = cheerio.load(html);
-
-    const docentes = {
-      tiempoCompleto: [],
-      tiempoCompletoOcasional: [],
-      horaCatedra: []
-    };
-
-    const extraerDocente = async (row) => {
-      const celdas = $(row).find("td");
-      if (celdas.length < 2) return null;
-
-      const infoText = $(celdas[0]).text().trim();
-      const imgSrc = $(celdas[1]).find("img").attr("src");
-
-      let nombre = "";
-      const strongText = $(celdas[0]).find("strong").first().text().trim();
-      if (strongText) {
-        nombre = strongText;
-      } else {
-        const lines = infoText.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.includes('Resolución') && !trimmed.includes('Profesor') && 
-              !trimmed.includes('Registro') && !trimmed.includes('Contacto') && !trimmed.includes('Campus') &&
-              !trimmed.includes('Hoja') && !trimmed.includes('Vida')) {
-            nombre = trimmed;
-            break;
-          }
-        }
-      }
-      
-      nombre = nombre.replace(/<\/?strong>/g, "").trim();
-
-      const resolucionMatch = infoText.match(/Resoluci[óo]n\s*(\d+)\s*-\s*([A-Za-z]+\s*\d{4})/i);
-      const resolucion = resolucionMatch ? resolucionMatch[0] : "";
-
-      const tituloMatch = infoText.match(/(Ph\.D\.|M\.Sc\.|Esp\.|Ing\.|Dr\.)\s*\.?\s*([^<]+)/i);
-      const titulo = tituloMatch ? tituloMatch[0].replace(/\s*-\s*$/, "") : "";
-
-      let cargo = "";
-      const cargoMatch = infoText.match(/Profesor\s*([A-Za-z\s]+)\s*-\s*Acuerdo/i);
-      if (cargoMatch) {
-        cargo = `Profesor ${cargoMatch[1].trim()}`;
-      }
-
-      let cvlac = "";
-      const cvlacRegex = /https?:\/\/scienti\.minciencias\.gov\.co\/[^\s"']+/i;
-      const cvlacMatch = infoText.match(cvlacRegex);
-      if (cvlacMatch) {
-        cvlac = cvlacMatch[0];
-      }
-      if (!cvlac) {
-        const htmlContent = $(celdas[0]).html();
-        const htmlCvlacMatch = htmlContent.match(/href="(https?:\/\/scienti\.minciencias\.gov\.co\/[^"]+)"/i);
-        if (htmlCvlacMatch) {
-          cvlac = htmlCvlacMatch[1];
-        }
-      }
-
-      const emailMatch = infoText.match(/Contacto:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-      let email = emailMatch ? emailMatch[1] : "";
-      if (!email) {
-        const emailDirectMatch = infoText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-        email = emailDirectMatch ? emailDirectMatch[1] : "";
-      }
-
-      let campus = "";
-      const campusMatch = infoText.match(/Campus:\s*([A-Za-z\s]+)/i);
-      if (campusMatch) {
-        campus = campusMatch[1].trim();
-        campus = campus.replace(/\s*Hoja de Vida.*$/i, "").replace(/\s*Hoja de vida.*$/i, "").trim();
-      }
-
-      let hojaVida = "";
-      const hojaVidaMatch = $(celdas[0]).find("a[href*='hoja_vida']").attr("href");
-      if (hojaVidaMatch) {
-        if (hojaVidaMatch.startsWith("/")) {
-          hojaVida = "https://www.unipamplona.edu.co" + hojaVidaMatch;
-        } else {
-          hojaVida = hojaVidaMatch;
-        }
-      }
-
-      let imagen = imgSrc || "";
-      if (imagen && imagen.startsWith("data:image")) {
-        imagen = await guardarImagenBase64(imagen, nombre || 'docente');
-      } else if (imagen && imagen.startsWith("/")) {
-        imagen = "https://www.unipamplona.edu.co" + imagen;
-      } else if (imagen && !imagen.startsWith("http") && imagen !== "") {
-        imagen = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/imagenes/" + imagen;
-      }
-
-      return {
-        nombre,
-        titulo,
-        cargo,
-        resolucion,
-        cvlac,
-        email,
-        campus,
-        hojaVida,
-        imagen
-      };
-    };
-
-    const primeraTabla = $("#texto table").first();
-    if (primeraTabla.length) {
-      const filas = primeraTabla.find("tbody tr");
-      for (const row of filas) {
-        const docente = await extraerDocente(row);
-        if (docente && docente.nombre) {
-          docentes.tiempoCompleto.push(docente);
-        }
-      }
-    }
-
-    const headers = $("#texto h1");
-    let tablaOcasional = null;
-    let tablaHoraCatedra = null;
-    
-    headers.each((i, header) => {
-      const headerText = $(header).text().trim();
-      if (headerText.includes("Docentes Tiempo Completo Ocasional")) {
-        let next = $(header).next();
-        while (next.length && next.get(0).tagName !== 'table') {
-          next = next.next();
-        }
-        if (next.length && next.get(0).tagName === 'table') {
-          tablaOcasional = next;
-        }
-      }
-      if (headerText.includes("Profesores Hora Cátedra")) {
-        let next = $(header).next();
-        while (next.length && next.get(0).tagName !== 'table') {
-          next = next.next();
-        }
-        if (next.length && next.get(0).tagName === 'table') {
-          tablaHoraCatedra = next;
-        }
-      }
-    });
-
-    if (tablaOcasional && tablaOcasional.length) {
-      const filasOcasionales = tablaOcasional.find("tbody tr");
-      for (const row of filasOcasionales) {
-        const docente = await extraerDocente(row);
-        if (docente && docente.nombre) {
-          docentes.tiempoCompletoOcasional.push(docente);
-        }
-      }
-    }
-
-    if (tablaHoraCatedra && tablaHoraCatedra.length) {
-      const filasCatedra = tablaHoraCatedra.find("tbody tr");
-      for (const row of filasCatedra) {
-        const docente = await extraerDocente(row);
-        if (docente && docente.nombre) {
-          docentes.horaCatedra.push(docente);
-        }
-      }
-    }
-
-    res.json({
-      fuente: urlFuente,
-      docentes
-    });
-
-  } catch (error) {
-    console.error("❌ Error scraping docentes:", error.message);
     res.status(500).json({
       error: "No se pudo obtener la información de docentes",
       mensaje: error.message
