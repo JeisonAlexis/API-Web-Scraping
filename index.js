@@ -675,11 +675,18 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
     });
 
     const $ = cheerio.load(html);
-
     const planes = [];
+
+    const limpiarDescripcion = (texto) => {
+      return texto
+        .replace(/\[Ver plan\]/gi, '')        
+        .replace(/\s+/g, ' ')                 
+        .trim();
+    };
 
     const h3s = $("#texto h3");
     let planSection = null;
+
     h3s.each((i, elem) => {
       if ($(elem).text().trim() === "Plan de Estudios") {
         planSection = $(elem).next("ul");
@@ -693,11 +700,7 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
         const enlace = $(li).find("a").attr("href");
         let urlCompleta = "";
         if (enlace) {
-          if (enlace.startsWith("/")) {
-            urlCompleta = "https://www.unipamplona.edu.co" + enlace;
-          } else {
-            urlCompleta = enlace;
-          }
+          urlCompleta = enlace.startsWith("/") ? "https://www.unipamplona.edu.co" + enlace : enlace;
         }
 
         let nombre = "";
@@ -710,10 +713,11 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
         } else {
           nombre = textoLi.split("[").shift().trim();
         }
+
         if (nombre && (textoLi.includes("Plan de estudios") || textoLi.includes("Propuesta de malla"))) {
           planes.push({
             nombre: nombre,
-            descripcion: textoLi.replace(/\s+/g, " ").trim(),
+            descripcion: limpiarDescripcion(textoLi),
             enlace: urlCompleta || "No disponible"
           });
         }
@@ -727,21 +731,17 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
           const enlace = $(li).find("a").attr("href");
           let urlCompleta = "";
           if (enlace) {
-            if (enlace.startsWith("/")) {
-              urlCompleta = "https://www.unipamplona.edu.co" + enlace;
-            } else {
-              urlCompleta = enlace;
-            }
+            urlCompleta = enlace.startsWith("/") ? "https://www.unipamplona.edu.co" + enlace : enlace;
           }
           let nombre = "";
           if (textoLi.includes("Plan de estudios 2019")) nombre = "Plan de estudios 2019";
           else if (textoLi.includes("Plan de estudios 2006")) nombre = "Plan de estudios 2006 (vigente antiguos)";
           else if (textoLi.includes("Propuesta de malla")) nombre = "Propuesta de malla curricular 2021";
           else nombre = textoLi.split("[").shift().trim();
-          
+
           planes.push({
             nombre: nombre,
-            descripcion: textoLi.replace(/\s+/g, " ").trim(),
+            descripcion: limpiarDescripcion(textoLi),
             enlace: urlCompleta || "No disponible"
           });
         }
