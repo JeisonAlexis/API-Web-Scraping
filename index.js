@@ -671,6 +671,7 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
     const { data: html } = await axios.get(urlFuente, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
     });
 
     const $ = cheerio.load(html);
