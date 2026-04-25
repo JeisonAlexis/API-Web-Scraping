@@ -1235,28 +1235,41 @@ app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
       if (listaSemilleros.length) {
         listaSemilleros.find("li").each((i, li) => {
           const texto = $(li).text().trim();
-          const nombreMatch = texto.match(/\*\*(.*?)\*\*/);
-          const nombre = nombreMatch ? nombreMatch[1].trim() : "";
+          if (!texto) return;
           
+          let nombre = "";
           let director = "";
           let email = "";
           
-          let resto = texto;
-          if (nombreMatch) {
-            resto = texto.replace(nombreMatch[0], "").trim();
-          }
-          resto = resto.replace(/^-\s*/, "");
-          
-          const emailMatch = resto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          const emailMatch = texto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
           if (emailMatch) {
             email = emailMatch[1];
-            director = resto.replace(email, "").trim();
-            director = director.replace(/-\s*$/, "").trim();
+            const partes = texto.split(" - ");
+            if (partes.length >= 3) {
+              nombre = partes[0].trim();
+              director = partes[1].trim();
+              email = partes[2].trim();
+            } else {
+              const textoSinEmail = texto.replace(email, "").trim();
+              const partesSinEmail = textoSinEmail.split(" - ");
+              if (partesSinEmail.length >= 2) {
+                nombre = partesSinEmail[0].trim();
+                director = partesSinEmail[1].trim();
+              } else {
+                nombre = textoSinEmail;
+              }
+            }
           } else {
-            director = resto;
+            const partes = texto.split(" - ");
+            if (partes.length >= 2) {
+              nombre = partes[0].trim();
+              director = partes.slice(1).join(" - ").trim();
+            } else {
+              nombre = texto;
+            }
           }
           
-          if (nombre) {
+          if (nombre && nombre.includes("Semillero")) {
             semilleros.push({
               nombre: nombre,
               director: director || "No disponible",
@@ -1271,24 +1284,26 @@ app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
       $("#texto ul li").each((i, li) => {
         const texto = $(li).text().trim();
         if (texto.includes("Semillero") && texto.includes("@")) {
-          const nombreMatch = texto.match(/\*\*(.*?)\*\*/);
-          const nombre = nombreMatch ? nombreMatch[1].trim() : "";
-          
+          let nombre = "";
           let director = "";
           let email = "";
+          
           const emailMatch = texto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
           if (emailMatch) {
             email = emailMatch[1];
-            let resto = texto;
-            if (nombreMatch) {
-              resto = texto.replace(nombreMatch[0], "").trim();
+            const partes = texto.split(" - ");
+            if (partes.length >= 3) {
+              nombre = partes[0].trim();
+              director = partes[1].trim();
+            } else {
+              const textoSinEmail = texto.replace(email, "").trim();
+              const partesSinEmail = textoSinEmail.split(" - ");
+              nombre = partesSinEmail[0].trim();
+              director = partesSinEmail.slice(1).join(" - ").trim();
             }
-            resto = resto.replace(/^-\s*/, "");
-            director = resto.replace(email, "").trim();
-            director = director.replace(/-\s*$/, "").trim();
           }
           
-          if (nombre) {
+          if (nombre && nombre.includes("Semillero")) {
             semilleros.push({
               nombre: nombre,
               director: director || "No disponible",
