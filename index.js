@@ -982,6 +982,130 @@ app.get("/resultados-aprendizaje-ingsistemas", async (req, res) => {
 });
 
 
+app.get("/direccion-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/23072013/01_elprograma_contenidos.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    
+    let director = {
+      nombre: "",
+      email: "",
+      horario: "",
+      imagen: ""
+    };
+    
+    let coordinador = {
+      nombre: "",
+      email: "",
+      horario: "",
+      imagen: ""
+    };
+
+    const tablaDireccion = $("h3:contains('Dirección')").next("table");
+    
+    if (tablaDireccion.length) {
+      const filas = tablaDireccion.find("tbody tr");
+      
+      if (filas.length >= 1) {
+        const primeraFila = filas.eq(0);
+        const celdas = primeraFila.find("td");
+        const infoDirector = $(celdas[0]).html();
+        
+        const nombreDirMatch = infoDirector.match(/<strong>Director de Programa<\/strong><br\s*\/?>(.*?)<br/);
+        if (nombreDirMatch) {
+          director.nombre = nombreDirMatch[1].trim();
+        } else {
+          const nombreSimple = $(celdas[0]).find("p").first().text().trim().replace("Director de Programa", "").trim();
+          if (nombreSimple) director.nombre = nombreSimple;
+        }
+        
+        const emailDirMatch = infoDirector.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailDirMatch) {
+          director.email = emailDirMatch[1];
+        }
+        
+        const horarioDirMatch = infoDirector.match(/Horario de atenci[óo]n:<br\s*\/?>(.*?)<\/p>/);
+        if (horarioDirMatch) {
+          director.horario = horarioDirMatch[1].replace(/<br\s*\/?>/g, ", ").trim();
+        }
+        
+        const imgDirector = $(celdas[1]).find("img");
+        if (imgDirector.length) {
+          let src = imgDirector.attr("src");
+          if (src) {
+            director.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
+          }
+        }
+      }
+      
+      if (filas.length >= 2) {
+        const segundaFila = filas.eq(1);
+        const celdas = segundaFila.find("td");
+        const infoCoordinador = $(celdas[0]).html();
+        
+        const nombreCoordMatch = infoCoordinador.match(/<strong>Coordinador de Programa Villa del Rosario<\/strong><br\s*\/?>(.*?)<br/);
+        if (nombreCoordMatch) {
+          coordinador.nombre = nombreCoordMatch[1].trim();
+        } else {
+          const nombreSimple = $(celdas[0]).find("p").first().text().trim().replace("Coordinador de Programa Villa del Rosario", "").trim();
+          if (nombreSimple) coordinador.nombre = nombreSimple;
+        }
+        
+        const emailCoordMatch = infoCoordinador.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailCoordMatch) {
+          coordinador.email = emailCoordMatch[1];
+        }
+        
+        const horarioCoordMatch = infoCoordinador.match(/Horario de atenci[óo]n:<br\s*\/?>(.*?)<\/p>/);
+        if (horarioCoordMatch) {
+          coordinador.horario = horarioCoordMatch[1].replace(/<br\s*\/?>/g, ", ").trim();
+        }
+        
+        const imgCoordinador = $(celdas[1]).find("img");
+        if (imgCoordinador.length) {
+          let src = imgCoordinador.attr("src");
+          if (src) {
+            coordinador.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
+          }
+        }
+      }
+    }
+
+    res.json({
+      fuente: urlFuente,
+      director: {
+        cargo: "Director de Programa",
+        nombre: director.nombre || "No disponible",
+        email: director.email || "No disponible",
+        horario: director.horario || "No disponible",
+        imagen: director.imagen || null
+      },
+      coordinador: {
+        cargo: "Coordinador de Programa - Villa del Rosario",
+        nombre: coordinador.nombre || "No disponible",
+        email: coordinador.email || "No disponible",
+        horario: coordinador.horario || "No disponible",
+        imagen: coordinador.imagen || null
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping dirección del programa:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de dirección del programa",
+      mensaje: error.message
+    });
+  }
+});
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
