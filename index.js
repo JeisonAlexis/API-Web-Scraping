@@ -664,6 +664,104 @@ app.get("/programas-acreditados", async (req, res) => {
   }
 });
 
+app.get("/plan-estudios-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/23072013/01_elprograma_contenidos.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    });
+
+    const $ = cheerio.load(html);
+
+    const planes = [];
+
+    const h3s = $("#texto h3");
+    let planSection = null;
+    h3s.each((i, elem) => {
+      if ($(elem).text().trim() === "Plan de Estudios") {
+        planSection = $(elem).next("ul");
+        return false;
+      }
+    });
+
+    if (planSection && planSection.length) {
+      planSection.find("li").each((i, li) => {
+        const textoLi = $(li).text().trim();
+        const enlace = $(li).find("a").attr("href");
+        let urlCompleta = "";
+        if (enlace) {
+          if (enlace.startsWith("/")) {
+            urlCompleta = "https://www.unipamplona.edu.co" + enlace;
+          } else {
+            urlCompleta = enlace;
+          }
+        }
+
+        let nombre = "";
+        if (textoLi.includes("Plan de estudios 2019")) {
+          nombre = "Plan de estudios 2019";
+        } else if (textoLi.includes("Plan de estudios 2006")) {
+          nombre = "Plan de estudios 2006 (vigente antiguos)";
+        } else if (textoLi.includes("Propuesta de malla curricular 2021")) {
+          nombre = "Propuesta de malla curricular 2021";
+        } else {
+          nombre = textoLi.split("[").shift().trim();
+        }
+        if (nombre && (textoLi.includes("Plan de estudios") || textoLi.includes("Propuesta de malla"))) {
+          planes.push({
+            nombre: nombre,
+            descripcion: textoLi.replace(/\s+/g, " ").trim(),
+            enlace: urlCompleta || "No disponible"
+          });
+        }
+      });
+    }
+
+    if (planes.length === 0) {
+      $("#texto ul li").each((i, li) => {
+        const textoLi = $(li).text().trim();
+        if (textoLi.includes("Plan de estudios") || textoLi.includes("Propuesta de malla")) {
+          const enlace = $(li).find("a").attr("href");
+          let urlCompleta = "";
+          if (enlace) {
+            if (enlace.startsWith("/")) {
+              urlCompleta = "https://www.unipamplona.edu.co" + enlace;
+            } else {
+              urlCompleta = enlace;
+            }
+          }
+          let nombre = "";
+          if (textoLi.includes("Plan de estudios 2019")) nombre = "Plan de estudios 2019";
+          else if (textoLi.includes("Plan de estudios 2006")) nombre = "Plan de estudios 2006 (vigente antiguos)";
+          else if (textoLi.includes("Propuesta de malla")) nombre = "Propuesta de malla curricular 2021";
+          else nombre = textoLi.split("[").shift().trim();
+          
+          planes.push({
+            nombre: nombre,
+            descripcion: textoLi.replace(/\s+/g, " ").trim(),
+            enlace: urlCompleta || "No disponible"
+          });
+        }
+      });
+    }
+
+    res.json({
+      fuente: urlFuente,
+      totalPlanes: planes.length,
+      planes: planes
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping plan de estudios:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información del plan de estudios",
+      mensaje: error.message
+    });
+  }
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
