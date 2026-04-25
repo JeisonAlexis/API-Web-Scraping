@@ -763,6 +763,74 @@ app.get("/plan-estudios-ingsistemas", async (req, res) => {
   }
 });
 
+app.get("/perfiles-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/01_elprograma.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+
+    let imagenPerfilEstudiante = "";
+    const h3Estudiante = $("h3:contains('Perfil del Estudiante')");
+    if (h3Estudiante.length) {
+      const imgTag = h3Estudiante.next("p").find("img");
+      if (imgTag.length) {
+        let src = imgTag.attr("src");
+        if (src) {
+          imagenPerfilEstudiante = src.startsWith("/")
+            ? "https://www.unipamplona.edu.co" + src
+            : src;
+        }
+      }
+    }
+
+    let perfilEgresadoTexto = "";
+    const h3Egresado = $("h3:contains('Perfil del Egresado')");
+    if (h3Egresado.length) {
+      let contenido = "";
+      let next = h3Egresado.next();
+      while (next.length && next[0].tagName !== 'h3') {
+        if (next[0].tagName === 'p') {
+          contenido += next.text().trim() + "\n";
+        }
+        if (next[0].tagName === 'ul') {
+          next.find("li").each((i, li) => {
+            contenido += `- ${$(li).text().trim()}\n`;
+          });
+        }
+        next = next.next();
+      }
+      perfilEgresadoTexto = contenido.trim();
+    }
+
+    res.json({
+      fuente: urlFuente,
+      perfiles: {
+        estudiante: {
+          tipo: "imagen",
+          url: imagenPerfilEstudiante || null
+        },
+        egresado: {
+          tipo: "texto",
+          contenido: perfilEgresadoTexto || null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping perfiles:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de los perfiles",
+      mensaje: error.message
+    });
+  }
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
