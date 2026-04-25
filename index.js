@@ -666,7 +666,7 @@ app.get("/programas-acreditados", async (req, res) => {
 
 app.get("/plan-estudios-ingsistemas", async (req, res) => {
   try {
-    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/23072013/01_elprograma_contenidos.jsp";
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/01_elprograma.jsp";
 
     const { data: html } = await axios.get(urlFuente, {
       headers: {
