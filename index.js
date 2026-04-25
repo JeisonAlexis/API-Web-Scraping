@@ -1244,28 +1244,30 @@ app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
           const emailMatch = texto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
           if (emailMatch) {
             email = emailMatch[1];
-            const partes = texto.split(" - ");
+            const textoSinEmail = texto.replace(email, "").trim().replace(/\s*-\s*$/, "");
+            const partes = textoSinEmail.split(" - ");
+            
             if (partes.length >= 3) {
+              nombre = partes[0].trim() + " - " + partes[1].trim();
+              director = partes.slice(2).join(" - ").trim();
+            } else if (partes.length === 2) {
               nombre = partes[0].trim();
               director = partes[1].trim();
-              email = partes[2].trim();
             } else {
-              const textoSinEmail = texto.replace(email, "").trim();
-              const partesSinEmail = textoSinEmail.split(" - ");
-              if (partesSinEmail.length >= 2) {
-                nombre = partesSinEmail[0].trim();
-                director = partesSinEmail[1].trim();
-              } else {
-                nombre = textoSinEmail;
-              }
+              nombre = textoSinEmail;
+              director = "No disponible";
             }
           } else {
             const partes = texto.split(" - ");
-            if (partes.length >= 2) {
+            if (partes.length >= 3) {
+              nombre = partes[0].trim() + " - " + partes[1].trim();
+              director = partes.slice(2).join(" - ").trim();
+            } else if (partes.length === 2) {
               nombre = partes[0].trim();
-              director = partes.slice(1).join(" - ").trim();
+              director = partes[1].trim();
             } else {
               nombre = texto;
+              director = "No disponible";
             }
           }
           
@@ -1291,15 +1293,18 @@ app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
           const emailMatch = texto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
           if (emailMatch) {
             email = emailMatch[1];
-            const partes = texto.split(" - ");
+            const textoSinEmail = texto.replace(email, "").trim().replace(/\s*-\s*$/, "");
+            const partes = textoSinEmail.split(" - ");
+            
             if (partes.length >= 3) {
+              nombre = partes[0].trim() + " - " + partes[1].trim();
+              director = partes.slice(2).join(" - ").trim();
+            } else if (partes.length === 2) {
               nombre = partes[0].trim();
               director = partes[1].trim();
             } else {
-              const textoSinEmail = texto.replace(email, "").trim();
-              const partesSinEmail = textoSinEmail.split(" - ");
-              nombre = partesSinEmail[0].trim();
-              director = partesSinEmail.slice(1).join(" - ").trim();
+              nombre = textoSinEmail;
+              director = "No disponible";
             }
           }
           
