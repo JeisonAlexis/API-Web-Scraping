@@ -1008,72 +1008,64 @@ app.get("/direccion-ingsistemas", async (req, res) => {
       imagen: ""
     };
 
-    const tablaDireccion = $("h3:contains('Dirección')").next("table");
-    
-    if (tablaDireccion.length) {
-      const filas = tablaDireccion.find("tbody tr");
+    const h3Direccion = $("h3:contains('Dirección')");
+    if (h3Direccion.length) {
+      let contenido = "";
+      let next = h3Direccion.next();
       
-      if (filas.length >= 1) {
-        const primeraFila = filas.eq(0);
-        const celdas = primeraFila.find("td");
-        const infoDirector = $(celdas[0]).html();
+      while (next.length && next[0].tagName !== 'h3') {
+        contenido += $(next).html() + "\n";
+        next = next.next();
+      }
+      
+      const directorBlock = contenido.match(/Director de Programa(.*?)(?=Coordinador de Programa|$)/s);
+      if (directorBlock) {
+        const directorTexto = directorBlock[1];
         
-        const nombreDirMatch = infoDirector.match(/<strong>Director de Programa<\/strong><br\s*\/?>(.*?)<br/);
-        if (nombreDirMatch) {
-          director.nombre = nombreDirMatch[1].trim();
-        } else {
-          const nombreSimple = $(celdas[0]).find("p").first().text().trim().replace("Director de Programa", "").trim();
-          if (nombreSimple) director.nombre = nombreSimple;
+        const nombreMatch = directorTexto.match(/(?:<br\s*\/?>\s*)([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+)+)/);
+        if (nombreMatch) {
+          director.nombre = nombreMatch[1].trim();
         }
         
-        const emailDirMatch = infoDirector.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-        if (emailDirMatch) {
-          director.email = emailDirMatch[1];
+        const emailMatch = directorTexto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          director.email = emailMatch[1];
         }
         
-        const horarioDirMatch = infoDirector.match(/Horario de atenci[óo]n:<br\s*\/?>(.*?)<\/p>/);
-        if (horarioDirMatch) {
-          director.horario = horarioDirMatch[1].replace(/<br\s*\/?>/g, ", ").trim();
-        }
-        
-        const imgDirector = $(celdas[1]).find("img");
-        if (imgDirector.length) {
-          let src = imgDirector.attr("src");
-          if (src) {
-            director.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
-          }
+        const horarioMatch = directorTexto.match(/Horario de atención:(?:<br\s*\/?>\s*)(.*?)(?:<br|$)/i);
+        if (horarioMatch) {
+          director.horario = horarioMatch[1].replace(/<br\s*\/?>/g, ", ").trim();
         }
       }
       
-      if (filas.length >= 2) {
-        const segundaFila = filas.eq(1);
-        const celdas = segundaFila.find("td");
-        const infoCoordinador = $(celdas[0]).html();
+      const coordinadorBlock = contenido.match(/Coordinador de Programa Villa del Rosario(.*?)(?=Acuerdo|Resolución|$)/s);
+      if (coordinadorBlock) {
+        const coordinadorTexto = coordinadorBlock[1];
         
-        const nombreCoordMatch = infoCoordinador.match(/<strong>Coordinador de Programa Villa del Rosario<\/strong><br\s*\/?>(.*?)<br/);
-        if (nombreCoordMatch) {
-          coordinador.nombre = nombreCoordMatch[1].trim();
-        } else {
-          const nombreSimple = $(celdas[0]).find("p").first().text().trim().replace("Coordinador de Programa Villa del Rosario", "").trim();
-          if (nombreSimple) coordinador.nombre = nombreSimple;
+        const nombreMatch = coordinadorTexto.match(/(?:<br\s*\/?>\s*)([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+)+)/);
+        if (nombreMatch) {
+          coordinador.nombre = nombreMatch[1].trim();
         }
         
-        const emailCoordMatch = infoCoordinador.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-        if (emailCoordMatch) {
-          coordinador.email = emailCoordMatch[1];
+        const emailMatch = coordinadorTexto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          coordinador.email = emailMatch[1];
         }
         
-        const horarioCoordMatch = infoCoordinador.match(/Horario de atenci[óo]n:<br\s*\/?>(.*?)<\/p>/);
-        if (horarioCoordMatch) {
-          coordinador.horario = horarioCoordMatch[1].replace(/<br\s*\/?>/g, ", ").trim();
+        const horarioMatch = coordinadorTexto.match(/Horario de atención:(?:<br\s*\/?>\s*)(.*?)(?=<br\s*\/?>\s*<br|$)/is);
+        if (horarioMatch) {
+          let horario = horarioMatch[1];
+          horario = horario.replace(/<br\s*\/?>/g, ", ").trim();
+          horario = horario.replace(/\s+/g, ' ');
+          coordinador.horario = horario;
         }
-        
-        const imgCoordinador = $(celdas[1]).find("img");
-        if (imgCoordinador.length) {
-          let src = imgCoordinador.attr("src");
-          if (src) {
-            coordinador.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
-          }
+      }
+      
+      const imgDirector = $("img[src*='directorp']").first();
+      if (imgDirector.length) {
+        let src = imgDirector.attr("src");
+        if (src) {
+          director.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
         }
       }
     }
