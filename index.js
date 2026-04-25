@@ -831,15 +831,7 @@ app.get("/perfiles-ingsistemas", async (req, res) => {
   }
 });
 
-app.use('/uploads', express.static(UPLOADS_DIR));
 
-app.use((err, req, res, next) => {
-  console.error("❌ Error no manejado:", err);
-  res.status(500).json({
-    error: "Error interno del servidor",
-    mensaje: err.message
-  });
-});
 
 
 app.get("/mision-vision-ingsistemas", async (req, res) => {
@@ -921,6 +913,83 @@ app.get("/mision-vision-ingsistemas", async (req, res) => {
       mensaje: error.message
     });
   }
+});
+
+
+app.get("/resultados-aprendizaje-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/01_elprograma.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    const resultados = [];
+
+    const h3Resultados = $("h3:contains('Resultados de Aprendizaje')");
+    if (h3Resultados.length) {
+      let next = h3Resultados.next();
+      while (next.length && next[0].tagName !== 'h3') {
+        if (next[0].tagName === 'p') {
+          const texto = next.text().trim();
+          const raMatch = texto.match(/^(RA\d+):\s*(.+)/);
+          if (raMatch) {
+            resultados.push({
+              codigo: raMatch[1],
+              descripcion: raMatch[2].trim()
+            });
+          }
+        }
+        next = next.next();
+      }
+    }
+
+    if (resultados.length === 0) {
+      $("#texto p").each((i, p) => {
+        const texto = $(p).text().trim();
+        const raMatch = texto.match(/^(RA\d+):\s*(.+)/);
+        if (raMatch) {
+          resultados.push({
+            codigo: raMatch[1],
+            descripcion: raMatch[2].trim()
+          });
+        }
+      });
+    }
+
+    resultados.sort((a, b) => {
+      const numA = parseInt(a.codigo.replace('RA', ''));
+      const numB = parseInt(b.codigo.replace('RA', ''));
+      return numA - numB;
+    });
+
+    res.json({
+      fuente: urlFuente,
+      totalResultados: resultados.length,
+      resultados: resultados
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping resultados de aprendizaje:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de los resultados de aprendizaje",
+      mensaje: error.message
+    });
+  }
+});
+
+
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+app.use((err, req, res, next) => {
+  console.error("❌ Error no manejado:", err);
+  res.status(500).json({
+    error: "Error interno del servidor",
+    mensaje: err.message
+  });
 });
 
 
