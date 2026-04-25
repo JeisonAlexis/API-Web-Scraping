@@ -1334,6 +1334,99 @@ app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
   }
 });
 
+
+app.get("/formatos-investigacion-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/02_investigacion.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    const formatos = [];
+
+    const h3Formatos = $("h3:contains('Formatos para el proceso de gestión de la investigación')");
+    
+    if (h3Formatos.length) {
+      let next = h3Formatos.next();
+      while (next.length && next[0].tagName !== 'ul') {
+        next = next.next();
+      }
+      
+      if (next.length && next[0].tagName === 'ul') {
+        next.find("li").each((i, li) => {
+          const texto = $(li).text().trim();
+          const enlace = $(li).find("a").attr("href");
+          let urlCompleta = "";
+          
+          if (enlace) {
+            urlCompleta = enlace.startsWith("/") 
+              ? "https://www.unipamplona.edu.co" + enlace 
+              : enlace;
+          }
+          
+          let nombre = texto.split('[')[0].trim();
+          if (nombre) {
+            formatos.push({
+              nombre: nombre,
+              descripcion: texto,
+              enlace: urlCompleta || "No disponible"
+            });
+          }
+        });
+      }
+    }
+
+    const anexos = [];
+    const h3Anexos = $("h3:contains('Anexos para Documento Maestro para Renovación de Plan de Estudios')");
+    
+    if (h3Anexos.length) {
+      let next = h3Anexos.next();
+      while (next.length && next[0].tagName !== 'ul') {
+        next = next.next();
+      }
+      
+      if (next.length && next[0].tagName === 'ul') {
+        next.find("li").each((i, li) => {
+          const texto = $(li).text().trim();
+          const enlace = $(li).find("a").attr("href");
+          let urlCompleta = "";
+          
+          if (enlace) {
+            urlCompleta = enlace.startsWith("/") 
+              ? "https://www.unipamplona.edu.co" + enlace 
+              : enlace;
+          }
+          
+          anexos.push({
+            nombre: texto,
+            enlace: urlCompleta || "No disponible"
+          });
+        });
+      }
+    }
+
+    res.json({
+      fuente: urlFuente,
+      formatos: formatos,
+      anexos: anexos,
+      totalFormatos: formatos.length,
+      totalAnexos: anexos.length
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping formatos de investigación:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de formatos de investigación",
+      mensaje: error.message
+    });
+  }
+});
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
