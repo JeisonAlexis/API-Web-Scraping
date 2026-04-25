@@ -1216,6 +1216,104 @@ app.get("/contacto-ingsistemas", async (req, res) => {
 });
 
 
+app.get("/semilleros-investigacion-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/02_investigacion.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    const semilleros = [];
+
+    const h3Semilleros = $("h3:contains('Semilleros de Investigación')");
+    if (h3Semilleros.length) {
+      const listaSemilleros = h3Semilleros.next("ul");
+      if (listaSemilleros.length) {
+        listaSemilleros.find("li").each((i, li) => {
+          const texto = $(li).text().trim();
+          const nombreMatch = texto.match(/\*\*(.*?)\*\*/);
+          const nombre = nombreMatch ? nombreMatch[1].trim() : "";
+          
+          let director = "";
+          let email = "";
+          
+          let resto = texto;
+          if (nombreMatch) {
+            resto = texto.replace(nombreMatch[0], "").trim();
+          }
+          resto = resto.replace(/^-\s*/, "");
+          
+          const emailMatch = resto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) {
+            email = emailMatch[1];
+            director = resto.replace(email, "").trim();
+            director = director.replace(/-\s*$/, "").trim();
+          } else {
+            director = resto;
+          }
+          
+          if (nombre) {
+            semilleros.push({
+              nombre: nombre,
+              director: director || "No disponible",
+              email: email || "No disponible"
+            });
+          }
+        });
+      }
+    }
+
+    if (semilleros.length === 0) {
+      $("#texto ul li").each((i, li) => {
+        const texto = $(li).text().trim();
+        if (texto.includes("Semillero") && texto.includes("@")) {
+          const nombreMatch = texto.match(/\*\*(.*?)\*\*/);
+          const nombre = nombreMatch ? nombreMatch[1].trim() : "";
+          
+          let director = "";
+          let email = "";
+          const emailMatch = texto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) {
+            email = emailMatch[1];
+            let resto = texto;
+            if (nombreMatch) {
+              resto = texto.replace(nombreMatch[0], "").trim();
+            }
+            resto = resto.replace(/^-\s*/, "");
+            director = resto.replace(email, "").trim();
+            director = director.replace(/-\s*$/, "").trim();
+          }
+          
+          if (nombre) {
+            semilleros.push({
+              nombre: nombre,
+              director: director || "No disponible",
+              email: email || "No disponible"
+            });
+          }
+        }
+      });
+    }
+
+    res.json({
+      fuente: urlFuente,
+      totalSemilleros: semilleros.length,
+      semilleros: semilleros
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping semilleros de investigación:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de semilleros de investigación",
+      mensaje: error.message
+    });
+  }
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
