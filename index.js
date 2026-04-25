@@ -1162,26 +1162,31 @@ app.get("/contacto-ingsistemas", async (req, res) => {
       ubicacion: ""
     };
 
-    const textoPie = $("#pie_enlaces p").text().trim();
+    const pieEnlaces = $("#pie_enlaces");
     
-    const lineas = textoPie.split('\n').map(l => l.trim()).filter(l => l);
-    
-    for (const linea of lineas) {
-      if (linea.includes("Sede Principal Pamplona")) {
-        const textoLimpio = linea.replace(/Sede Principal Pamplona:\s*/, '');
-        const emailMatch = textoLimpio.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (pieEnlaces.length) {
+      const htmlCompleto = pieEnlaces.html();
+      
+      const sedePrincipalMatch = htmlCompleto.match(/<strong>Sede Principal Pamplona<\/strong>:?\s*(.*?)<br/);
+      if (sedePrincipalMatch) {
+        const textoCompleto = sedePrincipalMatch[1].trim();
+        const emailMatch = textoCompleto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
           sedePrincipal.email = emailMatch[1];
         }
-        sedePrincipal.ubicacion = textoLimpio.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
+        const ubicacionCompleta = textoCompleto.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
+        sedePrincipal.ubicacion = ubicacionCompleta;
       }
-      if (linea.includes("Extensión Villa del Rosario")) {
-        const textoLimpio = linea.replace(/Extensión Villa del Rosario:\s*/, '');
-        const emailMatch = textoLimpio.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      
+      const sedeVillaMatch = htmlCompleto.match(/<strong>Extensi[óo]n Villa del Rosario<\/strong>:?\s*(.*?)(?:<br|$)/);
+      if (sedeVillaMatch) {
+        const textoCompleto = sedeVillaMatch[1].trim();
+        const emailMatch = textoCompleto.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
           sedeVilla.email = emailMatch[1];
         }
-        sedeVilla.ubicacion = textoLimpio.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
+        const ubicacionCompleta = textoCompleto.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
+        sedeVilla.ubicacion = ubicacionCompleta;
       }
     }
 
