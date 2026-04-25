@@ -1151,83 +1151,37 @@ app.get("/contacto-ingsistemas", async (req, res) => {
     const $ = cheerio.load(html);
     
     let sedePrincipal = {
-      nombre: "",
+      nombre: "Sede Principal Pamplona",
       email: "",
-      ubicacion: "",
-      edificio: ""
+      ubicacion: ""
     };
     
     let sedeVilla = {
-      nombre: "",
+      nombre: "Extensión Villa del Rosario",
       email: "",
-      ubicacion: "",
-      edificio: ""
+      ubicacion: ""
     };
 
-    const pieEnlaces = $("#pie_enlaces");
+    const textoPie = $("#pie_enlaces p").text().trim();
     
-    if (pieEnlaces.length) {
-      const textoCompleto = pieEnlaces.text().trim();
-      const htmlCompleto = pieEnlaces.html();
-      
-      const sedePrincipalMatch = htmlCompleto.match(/<strong>Sede Principal Pamplona<\/strong>:?\s*(.*?)<br/);
-      if (sedePrincipalMatch) {
-        const info = sedePrincipalMatch[1].trim();
-        const emailMatch = info.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    const lineas = textoPie.split('\n').map(l => l.trim()).filter(l => l);
+    
+    for (const linea of lineas) {
+      if (linea.includes("Sede Principal Pamplona")) {
+        const textoLimpio = linea.replace(/Sede Principal Pamplona:\s*/, '');
+        const emailMatch = textoLimpio.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
           sedePrincipal.email = emailMatch[1];
         }
-        const ubicacionMatch = info.match(/-?\s*(.*?)(?:$| -)/);
-        if (ubicacionMatch) {
-          const ubicacionCompleta = ubicacionMatch[1].trim();
-          const edificioMatch = ubicacionCompleta.match(/Edificio\s+([^-]+)/);
-          if (edificioMatch) {
-            sedePrincipal.edificio = edificioMatch[1].trim();
-          }
-          sedePrincipal.ubicacion = ubicacionCompleta.replace(/Edificio\s+[^-]+/, '').trim();
-        }
-        sedePrincipal.nombre = "Sede Principal Pamplona";
+        sedePrincipal.ubicacion = textoLimpio.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
       }
-      
-      const sedeVillaMatch = htmlCompleto.match(/<strong>Extensi[óo]n Villa del Rosario<\/strong>:?\s*(.*?)(?:<br|$)/);
-      if (sedeVillaMatch) {
-        const info = sedeVillaMatch[1].trim();
-        const emailMatch = info.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      if (linea.includes("Extensión Villa del Rosario")) {
+        const textoLimpio = linea.replace(/Extensión Villa del Rosario:\s*/, '');
+        const emailMatch = textoLimpio.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
           sedeVilla.email = emailMatch[1];
         }
-        const ubicacionMatch = info.match(/-?\s*(.*?)(?:$| -)/);
-        if (ubicacionMatch) {
-          const ubicacionCompleta = ubicacionMatch[1].trim();
-          const edificioMatch = ubicacionCompleta.match(/Edificio\s+([^-]+)/);
-          if (edificioMatch) {
-            sedeVilla.edificio = edificioMatch[1].trim();
-          }
-          sedeVilla.ubicacion = ubicacionCompleta.replace(/Edificio\s+[^-]+/, '').trim();
-        }
-        sedeVilla.nombre = "Extensión Villa del Rosario";
-      }
-    }
-
-    if (!sedePrincipal.email && !sedeVilla.email) {
-      const pieTexto = $("#pie_enlaces p").text().trim();
-      const lineas = pieTexto.split('\n').map(l => l.trim()).filter(l => l);
-      
-      for (const linea of lineas) {
-        if (linea.includes("Sede Principal Pamplona")) {
-          const emailMatch = linea.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-          if (emailMatch) sedePrincipal.email = emailMatch[1];
-          const edificioMatch = linea.match(/Edificio\s+([^-]+)/);
-          if (edificioMatch) sedePrincipal.edificio = edificioMatch[1];
-          sedePrincipal.ubicacion = linea.replace(/Sede Principal Pamplona:/, '').replace(emailMatch?.[1] || '', '').replace(/-/g, '').trim();
-        }
-        if (linea.includes("Extensión Villa del Rosario")) {
-          const emailMatch = linea.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-          if (emailMatch) sedeVilla.email = emailMatch[1];
-          const edificioMatch = linea.match(/Edificio\s+([^-]+)/);
-          if (edificioMatch) sedeVilla.edificio = edificioMatch[1];
-          sedeVilla.ubicacion = linea.replace(/Extensión Villa del Rosario:/, '').replace(emailMatch?.[1] || '', '').replace(/-/g, '').trim();
-        }
+        sedeVilla.ubicacion = textoLimpio.replace(emailMatch?.[1] || '', '').replace(/-\s*/, '').trim();
       }
     }
 
@@ -1235,16 +1189,14 @@ app.get("/contacto-ingsistemas", async (req, res) => {
       fuente: urlFuente,
       sedes: {
         principal: {
-          nombre: sedePrincipal.nombre || "Sede Principal Pamplona",
+          nombre: sedePrincipal.nombre,
           email: sedePrincipal.email || "dsistemas@unipamplona.edu.co",
-          ubicacion: sedePrincipal.ubicacion || "Edificio Ramón González Valencia (RG) - Primer piso",
-          edificio: sedePrincipal.edificio || "Ramón González Valencia (RG)"
+          ubicacion: sedePrincipal.ubicacion || "Edificio Ramón González Valencia (RG) - Primer piso"
         },
         villa: {
-          nombre: sedeVilla.nombre || "Extensión Villa del Rosario",
+          nombre: sedeVilla.nombre,
           email: sedeVilla.email || "dsistemasvilla@unipamplona.edu.co",
-          ubicacion: sedeVilla.ubicacion || "Edificio Los Patios, oficina 202",
-          edificio: sedeVilla.edificio || "Los Patios"
+          ubicacion: sedeVilla.ubicacion || "Edificio Los Patios, oficina 202"
         }
       }
     });
