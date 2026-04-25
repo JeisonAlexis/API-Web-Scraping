@@ -842,6 +842,88 @@ app.use((err, req, res, next) => {
 });
 
 
+app.get("/mision-vision-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/01_elprograma.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+
+    let misionUrl = "";
+    let visionUrl = "";
+
+    const h1VisionMision = $("h1:contains('Misión y Visión')");
+    if (h1VisionMision.length) {
+      let next = h1VisionMision.next();
+      let imagenesEncontradas = 0;
+      while (next.length && imagenesEncontradas < 2) {
+        if (next[0].tagName === 'p') {
+          const img = next.find("img");
+          if (img.length) {
+            const src = img.attr("src");
+            if (src) {
+              const urlAbsoluta = src.startsWith("/")
+                ? "https://www.unipamplona.edu.co" + src
+                : src;
+              if (src.toLowerCase().includes("mision")) {
+                misionUrl = urlAbsoluta;
+              } else if (src.toLowerCase().includes("vision")) {
+                visionUrl = urlAbsoluta;
+              }
+              imagenesEncontradas++;
+            }
+          }
+        }
+        next = next.next();
+      }
+    }
+
+    if (!misionUrl) {
+      const imgMision = $("img[src*='mision']").first();
+      if (imgMision.length) {
+        const src = imgMision.attr("src");
+        if (src) {
+          misionUrl = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
+        }
+      }
+    }
+    if (!visionUrl) {
+      const imgVision = $("img[src*='vision']").first();
+      if (imgVision.length) {
+        const src = imgVision.attr("src");
+        if (src) {
+          visionUrl = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
+        }
+      }
+    }
+
+    res.json({
+      fuente: urlFuente,
+      mision: {
+        tipo: "imagen",
+        url: misionUrl || null
+      },
+      vision: {
+        tipo: "imagen",
+        url: visionUrl || null
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping misión y visión:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de misión y visión",
+      mensaje: error.message
+    });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`\nServidor iniciado correctamente`);
   console.log(`Puerto: ${port}`);
