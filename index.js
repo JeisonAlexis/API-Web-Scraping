@@ -1432,99 +1432,89 @@ app.get("/comite-trabajo-social-ingsistemas-pamplona", async (req, res) => {
 
     const { data: html } = await axios.get(urlFuente, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0",
       },
     });
 
     const $ = cheerio.load(html);
-    
+
     const comites = {
       pamplona: [],
       villaRosario: []
     };
 
-    const normalizarTexto = (texto) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const normalizarTexto = (texto) =>
+      texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
     $("h3").each((i, elem) => {
       const textoH3 = $(elem).text().trim();
       const textoNormalizado = normalizarTexto(textoH3);
-      
-      if (textoNormalizado.includes("comite de trabajo social - pamplona")) {
-        const ul = $(elem).next("ul");
-        if (ul.length) {
-          ul.find("li").each((j, li) => {
-            const htmlLi = $(li).html();
-            const partes = htmlLi.split(/<br\s*\/?>/);
-            const nombreConRol = $(partes[0]).text().trim();
-            const email = partes.length > 1 ? $(partes[1]).text().trim() : "";
-            
-            let nombre = nombreConRol;
-            let rol = "";
-            const guionIndex = nombreConRol.indexOf(" - ");
-            if (guionIndex !== -1) {
-              nombre = nombreConRol.substring(0, guionIndex).trim();
-              rol = nombreConRol.substring(guionIndex + 3).trim();
-            }
-            
-            if (nombre) {
-              comites.pamplona.push({
-                nombre: nombre,
-                rol: rol || null,
-                email: email || null
-              });
-            }
-          });
+
+      let lista = null;
+      let destino = null;
+
+      if (textoNormalizado.includes("pamplona")) {
+        lista = $(elem).next("ul");
+        destino = comites.pamplona;
+      } 
+      else if (textoNormalizado.includes("villa del rosario")) {
+        lista = $(elem).next("ul");
+
+        if (!lista.length) {
+          lista = $(elem).next("div").find("ul").first();
         }
+
+        destino = comites.villaRosario;
       }
-      else if (textoNormalizado.includes("comite de trabajo social - villa del rosario")) {
-        let ul = $(elem).next("ul");
-        if (!ul.length) {
-          const div = $(elem).next("div");
-          if (div.length) ul = div.find("ul").first();
-        }
-        if (ul.length) {
-          ul.find("li").each((j, li) => {
-            const htmlLi = $(li).html();
-            const partes = htmlLi.split(/<br\s*\/?>/);
-            const nombreConRol = $(partes[0]).text().trim();
-            const email = partes.length > 1 ? $(partes[1]).text().trim() : "";
-            
-            let nombre = nombreConRol;
-            let rol = "";
-            const guionIndex = nombreConRol.indexOf(" - ");
-            if (guionIndex !== -1) {
-              nombre = nombreConRol.substring(0, guionIndex).trim();
-              rol = nombreConRol.substring(guionIndex + 3).trim();
-            } else {
-              const comaIndex = nombreConRol.indexOf(", ");
-              if (comaIndex !== -1) {
-                nombre = nombreConRol.substring(0, comaIndex).trim();
-                rol = nombreConRol.substring(comaIndex + 2).trim();
-              }
-            }
-            
-            if (nombre) {
-              comites.villaRosario.push({
-                nombre: nombre,
-                rol: rol || null,
-                email: email || null
-              });
-            }
+
+      if (lista && lista.length && destino) {
+        lista.find("li").each((j, li) => {
+
+          const texto = $(li)
+            .html()
+            .replace(/<br\s*\/?>/gi, "|")
+            .replace(/&nbsp;/g, " ")
+            .trim();
+
+          const partes = texto.split("|").map(p => p.trim());
+
+          let nombreConRol = cheerio.load(partes[0]).text().trim();
+          let email = partes[1] ? cheerio.load(partes[1]).text().trim() : "";
+
+          let nombre = nombreConRol;
+          let rol = "";
+
+          if (nombreConRol.includes(" - ")) {
+            const [n, r] = nombreConRol.split(" - ");
+            nombre = n.trim();
+            rol = r.trim();
+          }
+          else if (nombreConRol.includes(", ")) {
+            const [n, r] = nombreConRol.split(", ");
+            nombre = n.trim();
+            rol = r.trim();
+          }
+
+          destino.push({
+            nombre: nombre || null,
+            rol: rol || null,
+            email: email || null
           });
-        }
+        });
       }
     });
 
     res.json({
       fuente: urlFuente,
-      comites: comites
+      comites
     });
 
   } catch (error) {
-    console.error("❌ Error scraping comité de trabajo social:", error.message);
+    console.error("❌ Error scraping:", error.message);
+
     res.status(500).json({
-      error: "No se pudo obtener la información del comité de trabajo social",
-      mensaje: error.message
+      error: "No se pudo obtener la información",
+      detalle: error.message
     });
   }
 });
