@@ -1438,46 +1438,65 @@ app.get("/comite-trabajo-social-ingsistemas-pamplona", async (req, res) => {
 
     const $ = cheerio.load(html);
     
+    const textoCompleto = $("#texto").text().replace(/\s+/g, ' ').trim();
+    
     const comites = {
       pamplona: [],
       villaRosario: []
     };
 
-    const extraerMiembros = (titulo) => {
-      const miembros = [];
-      const h3 = $(`h3:contains('${titulo}')`);
-      if (h3.length) {
-        const ul = h3.next("ul");
-        if (ul.length) {
-          ul.find("li").each((i, li) => {
-            const htmlLi = $(li).html();
-            const partes = htmlLi.split(/<br\s*\/?>/);
-            const nombreConRol = $(partes[0]).text().trim();
-            const email = partes.length > 1 ? $(partes[1]).text().trim() : "";
-            
-            let nombre = nombreConRol;
-            let rol = "";
-            if (nombreConRol.includes(" - ")) {
-              const split = nombreConRol.split(" - ");
-              nombre = split[0].trim();
-              rol = split[1].trim();
-            }
-            
-            if (nombre) {
-              miembros.push({
-                nombre: nombre,
-                rol: rol || null,
-                email: email || null
-              });
-            }
+    const regexPamplona = /Comité de Trabajo Social - Pamplona - (.*?)(?:##|Comité de Trabajo Social - Villa del Rosario)/i;
+    const matchPamplona = regexPamplona.exec(textoCompleto);
+    if (matchPamplona && matchPamplona[1]) {
+      const miembrosTexto = matchPamplona[1];
+      const miembrosArray = miembrosTexto.split(/\s*-\s*/);
+      for (let i = 0; i < miembrosArray.length; i += 2) {
+        const nombreCompleto = miembrosArray[i];
+        if (nombreCompleto) {
+          let rol = "";
+          let nombre = nombreCompleto;
+          const rolMatch = nombreCompleto.match(/(.*?)(?:\s*[,-]\s*(.*)|$)/);
+          if (rolMatch && rolMatch[2]) {
+            nombre = rolMatch[1].trim();
+            rol = rolMatch[2].trim();
+          }
+          const email = i + 1 < miembrosArray.length ? miembrosArray[i + 1].trim() : "";
+          comites.pamplona.push({
+            nombre: nombre,
+            rol: rol || null,
+            email: email || null
           });
         }
       }
-      return miembros;
-    };
+    }
 
-    comites.pamplona = extraerMiembros("Comité de Trabajo Social - Pamplona");
-    comites.villaRosario = extraerMiembros("Comité de Trabajo Social - Villa del Rosario");
+    const regexVilla = /Comité de Trabajo Social - Villa del Rosario - (.*?)(?:##|Definición)/i;
+    const matchVilla = regexVilla.exec(textoCompleto);
+    if (matchVilla && matchVilla[1]) {
+      const miembrosTexto = matchVilla[1];
+      const miembrosArray = miembrosTexto.split(/\s*-\s*/);
+      for (let i = 0; i < miembrosArray.length; i += 2) {
+        const nombreCompleto = miembrosArray[i];
+        if (nombreCompleto) {
+          let rol = "";
+          let nombre = nombreCompleto;
+          const rolMatch = nombreCompleto.match(/(.*?)(?:\s*[,-]\s*(.*)|$)/);
+          if (rolMatch && rolMatch[2]) {
+            nombre = rolMatch[1].trim();
+            rol = rolMatch[2].trim();
+          }
+          const email = i + 1 < miembrosArray.length ? miembrosArray[i + 1].trim() : "";
+          comites.villaRosario.push({
+            nombre: nombre,
+            rol: rol || null,
+            email: email || null
+          });
+        }
+      }
+    }
+
+    comites.pamplona = comites.pamplona.filter(m => m.email && !m.email.includes('Comité'));
+    comites.villaRosario = comites.villaRosario.filter(m => m.email && !m.email.includes('Comité'));
 
     res.json({
       fuente: urlFuente,
