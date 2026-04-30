@@ -1426,6 +1426,73 @@ app.get("/formatos-investigacion-ingsistemas", async (req, res) => {
   }
 });
 
+app.get("/comite-trabajo-social-ingsistemas-pamplona", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/03_trabajosocial.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    
+    const comites = {
+      pamplona: [],
+      villaRosario: []
+    };
+
+    const extraerMiembros = (titulo) => {
+      const miembros = [];
+      const h3 = $(`h3:contains('${titulo}')`);
+      if (h3.length) {
+        const ul = h3.next("ul");
+        if (ul.length) {
+          ul.find("li").each((i, li) => {
+            const htmlLi = $(li).html();
+            const partes = htmlLi.split(/<br\s*\/?>/);
+            const nombreConRol = $(partes[0]).text().trim();
+            const email = partes.length > 1 ? $(partes[1]).text().trim() : "";
+            
+            let nombre = nombreConRol;
+            let rol = "";
+            if (nombreConRol.includes(" - ")) {
+              const split = nombreConRol.split(" - ");
+              nombre = split[0].trim();
+              rol = split[1].trim();
+            }
+            
+            if (nombre) {
+              miembros.push({
+                nombre: nombre,
+                rol: rol || null,
+                email: email || null
+              });
+            }
+          });
+        }
+      }
+      return miembros;
+    };
+
+    comites.pamplona = extraerMiembros("Comité de Trabajo Social - Pamplona");
+    comites.villaRosario = extraerMiembros("Comité de Trabajo Social - Villa del Rosario");
+
+    res.json({
+      fuente: urlFuente,
+      comites: comites
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping comité de trabajo social:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información del comité de trabajo social",
+      mensaje: error.message
+    });
+  }
+});
+
 
 app.use('/uploads', express.static(UPLOADS_DIR));
 
