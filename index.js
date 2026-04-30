@@ -1533,48 +1533,53 @@ app.get("/trabajo-social-ingsistemas", async (req, res) => {
     const $ = cheerio.load(html);
     
     let definicion = "";
+    let procedimiento = {
+      imagen: "",
+      pasos: [],
+      nota: ""
+    };
+
     const h1Definicion = $("h1:contains('Definición')");
     if (h1Definicion.length) {
       const divDefinicion = h1Definicion.next("div");
       if (divDefinicion.length) {
         definicion = divDefinicion.text().trim();
       }
-    }
-
-    let pasos = [];
-    let nota = "";
-    const h3Procedimiento = $("h3:contains('Procedimiento')");
-    if (h3Procedimiento.length) {
-      let next = h3Procedimiento.next();
-      while (next.length && next[0].tagName !== 'ol') {
-        next = next.next();
-      }
-      if (next.length && next[0].tagName === 'ol') {
-        next.find("li").each((i, li) => {
-          const textoPaso = $(li).text().trim();
-          if (textoPaso) {
-            pasos.push(textoPaso);
+      
+      const divProcedimiento = divDefinicion.next("div");
+      if (divProcedimiento.length) {
+        const h3Procedimiento = divProcedimiento.find("h3:contains('Procedimiento')");
+        if (h3Procedimiento.length) {
+          const img = h3Procedimiento.next("p").find("img");
+          if (img.length) {
+            let src = img.attr("src");
+            if (src) {
+              procedimiento.imagen = src.startsWith("/") ? "https://www.unipamplona.edu.co" + src : src;
+            }
           }
-        });
-      }
-      let afterList = next.next();
-      while (afterList.length && afterList[0].tagName !== 'div') {
-        afterList = afterList.next();
-      }
-      if (afterList.length && afterList[0].tagName === 'div') {
-        const textoNota = afterList.text().trim();
-        if (textoNota.startsWith("Nota:")) {
-          nota = textoNota;
+          
+          const ol = divProcedimiento.find("ol");
+          if (ol.length) {
+            ol.find("li").each((i, li) => {
+              procedimiento.pasos.push($(li).text().trim());
+            });
+          }
+          
+          const notaDiv = ol.parent().next("div");
+          if (notaDiv.length && notaDiv.text().includes("Nota:")) {
+            procedimiento.nota = notaDiv.text().trim();
+          }
         }
       }
     }
 
     res.json({
       fuente: urlFuente,
-      definicion: definicion,
+      definicion: definicion || "No disponible",
       procedimiento: {
-        pasos: pasos,
-        nota: nota
+        imagen: procedimiento.imagen || null,
+        pasos: procedimiento.pasos,
+        nota: procedimiento.nota || "No disponible"
       }
     });
 
