@@ -1520,6 +1520,74 @@ app.get("/comite-trabajo-social-ingsistemas-pamplona", async (req, res) => {
 });
 
 
+app.get("/trabajo-social-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/03_trabajosocial.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+    
+    let definicion = "";
+    const h1Definicion = $("h1:contains('Definición')");
+    if (h1Definicion.length) {
+      const divDefinicion = h1Definicion.next("div");
+      if (divDefinicion.length) {
+        definicion = divDefinicion.text().trim();
+      }
+    }
+
+    let pasos = [];
+    let nota = "";
+    const h3Procedimiento = $("h3:contains('Procedimiento')");
+    if (h3Procedimiento.length) {
+      let next = h3Procedimiento.next();
+      while (next.length && next[0].tagName !== 'ol') {
+        next = next.next();
+      }
+      if (next.length && next[0].tagName === 'ol') {
+        next.find("li").each((i, li) => {
+          const textoPaso = $(li).text().trim();
+          if (textoPaso) {
+            pasos.push(textoPaso);
+          }
+        });
+      }
+      let afterList = next.next();
+      while (afterList.length && afterList[0].tagName !== 'div') {
+        afterList = afterList.next();
+      }
+      if (afterList.length && afterList[0].tagName === 'div') {
+        const textoNota = afterList.text().trim();
+        if (textoNota.startsWith("Nota:")) {
+          nota = textoNota;
+        }
+      }
+    }
+
+    res.json({
+      fuente: urlFuente,
+      definicion: definicion,
+      procedimiento: {
+        pasos: pasos,
+        nota: nota
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping trabajo social:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de trabajo social",
+      mensaje: error.message
+    });
+  }
+});
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
