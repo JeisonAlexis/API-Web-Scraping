@@ -1592,39 +1592,41 @@ app.get("/trabajo-social-ingsistemas", async (req, res) => {
   }
 });
 
-
 app.get("/entregables-trabajo-social-ingsistemas", async (req, res) => {
   try {
     const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/03_trabajosocial.jsp";
 
     const { data: html } = await axios.get(urlFuente, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0",
       },
     });
 
     const $ = cheerio.load(html);
 
     const entregables = {};
-
+    const documentos = [];
     const h3Entregables = $("h3:contains('Entregables')");
+
     if (h3Entregables.length) {
       let current = h3Entregables.next();
       let textos = [];
 
-      while (current.length && current[0].tagName !== 'h3') {
-        if (current[0].tagName === 'p') {
+      while (current.length && current[0].tagName !== "h3") {
+        if (current[0].tagName === "p") {
           textos.push(current.text().trim());
         }
-        if (current[0].tagName === 'ul') {
-          current.find('li').each((i, li) => {
+
+        if (current[0].tagName === "ul") {
+          current.find("li").each((i, li) => {
             textos.push($(li).text().trim());
           });
         }
+
         current = current.next();
       }
 
-      const textoCompleto = textos.join('\n');
+      const textoCompleto = textos.join("\n");
 
       const matchEntidad = textoCompleto.match(/Datos de entidad para inscripción:\s*(.*?)(?=Datos de propuesta:|$)/s);
       if (matchEntidad) {
@@ -1657,19 +1659,45 @@ app.get("/entregables-trabajo-social-ingsistemas", async (req, res) => {
       }
     }
 
+    const h3Documentos = $("h3:contains('Documentos')");
+
+    if (h3Documentos.length) {
+      let ul = h3Documentos.next("ul");
+
+      if (ul.length) {
+        ul.find("li").each((i, li) => {
+          const link = $(li).find("a");
+
+          const nombre = link.text().trim();
+          const href = link.attr("href");
+
+          if (nombre && href) {
+            documentos.push({
+              nombre,
+              url: href.startsWith("http")
+                ? href
+                : `https://www.unipamplona.edu.co${href}`
+            });
+          }
+        });
+      }
+    }
+
     if (Object.keys(entregables).length === 0) {
-      entregables.textoCompleto = "No se pudo extraer la información estructurada. Revisar la página origen.";
+      entregables.textoCompleto = "No se pudo extraer la información estructurada.";
     }
 
     res.json({
       fuente: urlFuente,
-      entregables: entregables
+      entregables,
+      documentos
     });
 
   } catch (error) {
     console.error("❌ Error scraping trabajo social:", error.message);
+
     res.status(500).json({
-      error: "No se pudo obtener la información de trabajo social",
+      error: "No se pudo obtener la información",
       mensaje: error.message
     });
   }
