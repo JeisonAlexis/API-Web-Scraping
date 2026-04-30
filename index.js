@@ -1593,6 +1593,89 @@ app.get("/trabajo-social-ingsistemas", async (req, res) => {
 });
 
 
+app.get("/entregables-trabajo-social-ingsistemas", async (req, res) => {
+  try {
+    const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_77/recursos/01general/22072013/03_trabajosocial.jsp";
+
+    const { data: html } = await axios.get(urlFuente, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    const $ = cheerio.load(html);
+
+    const entregables = {};
+
+    const h3Entregables = $("h3:contains('Entregables')");
+    if (h3Entregables.length) {
+      let current = h3Entregables.next();
+      let textos = [];
+
+      while (current.length && current[0].tagName !== 'h3') {
+        if (current[0].tagName === 'p') {
+          textos.push(current.text().trim());
+        }
+        if (current[0].tagName === 'ul') {
+          current.find('li').each((i, li) => {
+            textos.push($(li).text().trim());
+          });
+        }
+        current = current.next();
+      }
+
+      const textoCompleto = textos.join('\n');
+
+      const matchEntidad = textoCompleto.match(/Datos de entidad para inscripción:\s*(.*?)(?=Datos de propuesta:|$)/s);
+      if (matchEntidad) {
+        entregables.datosEntidad = matchEntidad[1].trim();
+      }
+
+      const matchPropuesta = textoCompleto.match(/Datos de propuesta:\s*(.*?)(?=Evidencias:|$)/s);
+      if (matchPropuesta) {
+        entregables.datosPropuesta = matchPropuesta[1].trim();
+      }
+
+      const matchEvidencias = textoCompleto.match(/Evidencias:\s*(.*?)(?=Adicional a la inscripción|$)/s);
+      if (matchEvidencias) {
+        entregables.evidencias = matchEvidencias[1].trim();
+      }
+
+      const matchAdicional = textoCompleto.match(/Adicional a la inscripción de la propuesta diligenciar lo siguiente:\s*(.*?)$/s);
+      if (matchAdicional) {
+        const adicionalTexto = matchAdicional[1].trim();
+
+        const externosMatch = adicionalTexto.match(/Externos a la Universidad:\s*(.*?)(?=En la Universidad:|$)/s);
+        if (externosMatch) {
+          entregables.externosUniversidad = externosMatch[1].trim();
+        }
+
+        const universidadMatch = adicionalTexto.match(/En la Universidad:\s*(.*?)$/s);
+        if (universidadMatch) {
+          entregables.enLaUniversidad = universidadMatch[1].trim();
+        }
+      }
+    }
+
+    if (Object.keys(entregables).length === 0) {
+      entregables.textoCompleto = "No se pudo extraer la información estructurada. Revisar la página origen.";
+    }
+
+    res.json({
+      fuente: urlFuente,
+      entregables: entregables
+    });
+
+  } catch (error) {
+    console.error("❌ Error scraping trabajo social:", error.message);
+    res.status(500).json({
+      error: "No se pudo obtener la información de trabajo social",
+      mensaje: error.message
+    });
+  }
+});
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
