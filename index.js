@@ -1764,29 +1764,54 @@ app.get("/docentes-mecatronica", async (req, res) => {
       }
 
       let areasActuacion = [];
-      const htmlAcademica = infoAcademica.html() || "";
-      const areasMatch = htmlAcademica.match(/Áreas de actuación:<\/strong>(.*?)(?:<div|<p|<br|$)/i);
-      if (areasMatch) {
-        const areasHtml = areasMatch[1];
-        const $areas = cheerio.load(areasHtml);
-        $areas("ul li").each((i, li) => {
-          const texto = $areas(li).text().trim();
-          if (texto) areasActuacion.push(texto);
-        });
-        if (areasActuacion.length === 0) {
-          const textoAreas = $areas.text().trim();
-          if (textoAreas) {
-            areasActuacion = textoAreas.split(/\n|•|-/).map(a => a.trim()).filter(a => a);
+
+      let areasElement = null;
+      infoAcademica.find("*").each((i, el) => {
+        const htmlEl = $(el).html();
+        if (htmlEl && htmlEl.includes("Áreas de actuación:")) {
+          areasElement = $(el);
+          return false; 
+        }
+      });
+
+      if (areasElement) {
+        let list = areasElement.next();
+        if (list.is("div")) {
+          list = list.find("ul").first();
+        } else if (!list.is("ul")) {
+          list = areasElement.closest("div").find("ul").first();
+          if (!list.length) {
+            list = areasElement.parent().find("ul").first();
           }
         }
-      } else {
-        const textoCompleto = infoAcademica.text();
-        const areasIndex = textoCompleto.indexOf("Áreas de actuación:");
-        if (areasIndex !== -1) {
-          let areasText = textoCompleto.substring(areasIndex + 18);
-          const nextSection = areasText.search(/(Correo|Currículum|CVLAC|Formación|\n\s*\n)/i);
-          if (nextSection !== -1) areasText = areasText.substring(0, nextSection);
-          areasActuacion = areasText.split(/\n|•|-/).map(a => a.trim()).filter(a => a && a.length > 2);
+
+        if (list.length) {
+          list.find("li").each((i, li) => {
+            const texto = $(li).text().trim();
+            if (texto) areasActuacion.push(texto);
+          });
+        } else {
+          const htmlAcademica = infoAcademica.html() || "";
+          const areasMatch = htmlAcademica.replace(/<br\s*\/?>/gi, "\n").match(/Áreas de actuación:[\s\S]*?(?=<(?:div|p|br|\/ul|h2|h3|strong>|$))/i);
+          if (areasMatch) {
+            let areasText = areasMatch[0]
+              .replace(/Áreas de actuación:\s*/i, "")
+              .replace(/<(?:li|ul|div|p)[^>]*>/gi, "\n")
+              .replace(/<\/[^>]+>/g, "")
+              .trim();
+            areasActuacion = areasText.split(/\n|•|-/).map(a => a.trim()).filter(a => a && a.length > 2);
+          }
+        }
+      }
+      if (areasActuacion.length === 0) {
+        const htmlAcademica = infoAcademica.html() || "";
+        const listaMatch = htmlAcademica.match(/Áreas?\s*de\s*actuación:<\/strong>[\s\S]*?(<ul>.*?<\/ul>)/i);
+        if (listaMatch && listaMatch[1]) {
+          const $lista = cheerio.load(listaMatch[1]);
+          $lista("li").each((i, li) => {
+            const texto = $lista(li).text().trim();
+            if (texto) areasActuacion.push(texto);
+          });
         }
       }
 
