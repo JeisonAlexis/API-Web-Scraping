@@ -1703,9 +1703,10 @@ app.get("/entregables-trabajo-social-ingsistemas", async (req, res) => {
   }
 });
 
-
 app.get("/docentes-mecatronica", async (req, res) => {
   try {
+    await ensureUploadsDir();
+
     const urlFuente = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_136/recursos/general/20042015/cuerpo_docente.jsp";
 
     const { data: html } = await axios.get(urlFuente, {
@@ -1717,119 +1718,122 @@ app.get("/docentes-mecatronica", async (req, res) => {
     const $ = cheerio.load(html);
     const docentes = [];
 
+    const extraerDocente = async (row) => {
+      const celdas = $(row).find("td");
+      if (celdas.length < 2) return null;
+
+      const infoPersonal = $(celdas[0]);
+      const infoAcademica = $(celdas[1]);
+      const imgSrc = infoPersonal.find("img").attr("src");
+
+      let nombre = "";
+      const nombreStrong = infoPersonal.find("strong").first();
+      if (nombreStrong.length) {
+        nombre = nombreStrong.text().trim();
+      } else {
+        const nombreSpan = infoPersonal.find("span");
+        if (nombreSpan.length) nombre = nombreSpan.text().trim();
+      }
+      nombre = nombre.replace(/<[^>]*>/g, "").trim();
+
+      let cargo = "";
+      const textoPersonal = infoPersonal.text().trim();
+      const lineasPersonal = textoPersonal.split('\n');
+      for (const linea of lineasPersonal) {
+        const lineaTrim = linea.trim();
+        if (lineaTrim.includes("Docente") && !lineaTrim.includes(nombre)) {
+          cargo = lineaTrim;
+          break;
+        }
+      }
+
+      let formacion = [];
+      const formacionList = infoAcademica.find("ul").first();
+      if (formacionList.length) {
+        formacionList.find("li").each((i, li) => {
+          const texto = $(li).text().trim();
+          if (texto) formacion.push(texto);
+        });
+      } else {
+        infoAcademica.find("p").each((i, p) => {
+          const texto = $(p).text().trim();
+          if (texto.includes("•") || texto.includes("-")) {
+            formacion.push(texto);
+          }
+        });
+      }
+
+      let areasActuacion = [];
+      const htmlAcademica = infoAcademica.html() || "";
+      const areasMatch = htmlAcademica.match(/Áreas de actuación:<\/strong>(.*?)(?:<div|<p|<br|$)/i);
+      if (areasMatch) {
+        const areasHtml = areasMatch[1];
+        const $areas = cheerio.load(areasHtml);
+        $areas("ul li").each((i, li) => {
+          const texto = $areas(li).text().trim();
+          if (texto) areasActuacion.push(texto);
+        });
+        if (areasActuacion.length === 0) {
+          const textoAreas = $areas.text().trim();
+          if (textoAreas) {
+            areasActuacion = textoAreas.split(/\n|•|-/).map(a => a.trim()).filter(a => a);
+          }
+        }
+      } else {
+        const textoCompleto = infoAcademica.text();
+        const areasIndex = textoCompleto.indexOf("Áreas de actuación:");
+        if (areasIndex !== -1) {
+          let areasText = textoCompleto.substring(areasIndex + 18);
+          const nextSection = areasText.search(/(Correo|Currículum|CVLAC|Formación|\n\s*\n)/i);
+          if (nextSection !== -1) areasText = areasText.substring(0, nextSection);
+          areasActuacion = areasText.split(/\n|•|-/).map(a => a.trim()).filter(a => a && a.length > 2);
+        }
+      }
+
+      let email = "";
+      const emailMatch = textoPersonal.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      if (emailMatch) {
+        email = emailMatch[1];
+      } else {
+        const emailAcadMatch = infoAcademica.text().match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailAcadMatch) email = emailAcadMatch[1];
+      }
+
+      let cvlac = "";
+      const cvlacLink = infoAcademica.find("a[href*='cvlac']").first();
+      if (cvlacLink.length) {
+        cvlac = cvlacLink.attr("href");
+      }
+
+      let imagen = imgSrc || "";
+      if (imagen && imagen.startsWith("data:image")) {
+        imagen = await guardarImagenBase64(imagen, nombre || 'docente');
+      } else if (imagen && imagen.startsWith("/")) {
+        imagen = "https://www.unipamplona.edu.co" + imagen;
+      } else if (imagen && !imagen.startsWith("http") && imagen !== "") {
+        imagen = "https://www.unipamplona.edu.co/unipamplona/portalIG/home_136/recursos/" + imagen;
+      }
+
+      if (!nombre) return null;
+
+      return {
+        nombre,
+        cargo: cargo || "Docente",
+        formacion: formacion,
+        areasActuacion: areasActuacion,
+        email: email || null,
+        cvlac: cvlac || null,
+        imagen: imagen || null
+      };
+    };
+
     const tablaDocentes = $("#texto table");
     if (tablaDocentes.length) {
       const filas = tablaDocentes.find("tbody tr");
-      
       for (const row of filas) {
-        const celdas = $(row).find("td");
-        if (celdas.length < 2) continue;
-
-        const infoPersonal = $(celdas[0]);
-        const infoAcademica = $(celdas[1]);
-
-        let nombre = "";
-        const nombreStrong = infoPersonal.find("strong").first();
-        if (nombreStrong.length) {
-          nombre = nombreStrong.text().trim();
-        } else {
-          const nombreSpan = infoPersonal.find("span");
-          if (nombreSpan.length) nombre = nombreSpan.text().trim();
-        }
-        nombre = nombre.replace(/<[^>]*>/g, "").trim();
-
-        let cargo = "";
-        const textoPersonal = infoPersonal.text().trim();
-        const lineasPersonal = textoPersonal.split('\n');
-        for (const linea of lineasPersonal) {
-          const lineaTrim = linea.trim();
-          if (lineaTrim.includes("Docente") && !lineaTrim.includes(nombre)) {
-            cargo = lineaTrim;
-            break;
-          }
-        }
-
-        let imagen = "";
-        const img = infoPersonal.find("img").first();
-        if (img.length) {
-          let src = img.attr("src");
-          if (src) {
-            if (src.startsWith("/")) {
-              imagen = "https://www.unipamplona.edu.co" + src;
-            } else {
-              imagen = src;
-            }
-          }
-        }
-
-        let formacion = [];
-        const formacionList = infoAcademica.find("ul").first();
-        if (formacionList.length) {
-          formacionList.find("li").each((i, li) => {
-            const texto = $(li).text().trim();
-            if (texto) formacion.push(texto);
-          });
-        } else {
-          infoAcademica.find("p").each((i, p) => {
-            const texto = $(p).text().trim();
-            if (texto.includes("•") || texto.includes("-")) {
-              formacion.push(texto);
-            }
-          });
-        }
-
-        let areasActuacion = [];
-        const htmlAcademica = infoAcademica.html() || "";
-        const areasMatch = htmlAcademica.match(/Áreas de actuación:<\/strong>(.*?)(?:<div|<p|<br|$)/i);
-        if (areasMatch) {
-          const areasHtml = areasMatch[1];
-          const $areas = cheerio.load(areasHtml);
-          $areas("ul li").each((i, li) => {
-            const texto = $areas(li).text().trim();
-            if (texto) areasActuacion.push(texto);
-          });
-          if (areasActuacion.length === 0) {
-            const textoAreas = $areas.text().trim();
-            if (textoAreas) {
-              areasActuacion = textoAreas.split(/\n|•|-/).map(a => a.trim()).filter(a => a);
-            }
-          }
-        } else {
-          const textoCompleto = infoAcademica.text();
-          const areasIndex = textoCompleto.indexOf("Áreas de actuación:");
-          if (areasIndex !== -1) {
-            let areasText = textoCompleto.substring(areasIndex + 18);
-            const nextSection = areasText.search(/(Correo|Currículum|CVLAC|Formación|\n\s*\n)/i);
-            if (nextSection !== -1) areasText = areasText.substring(0, nextSection);
-            areasActuacion = areasText.split(/\n|•|-/).map(a => a.trim()).filter(a => a && a.length > 2);
-          }
-        }
-
-        let email = "";
-        const emailMatch = textoPersonal.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-        if (emailMatch) {
-          email = emailMatch[1];
-        } else {
-          const emailAcadMatch = infoAcademica.text().match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-          if (emailAcadMatch) email = emailAcadMatch[1];
-        }
-
-        let cvlac = "";
-        const cvlacLink = infoAcademica.find("a[href*='cvlac']").first();
-        if (cvlacLink.length) {
-          cvlac = cvlacLink.attr("href");
-        }
-
-        if (nombre) {
-          docentes.push({
-            nombre: nombre,
-            cargo: cargo || "Docente",
-            formacion: formacion,
-            areasActuacion: areasActuacion,
-            email: email || null,
-            cvlac: cvlac || null,
-            imagen: imagen || null
-          });
+        const docente = await extraerDocente(row);
+        if (docente && docente.nombre) {
+          docentes.push(docente);
         }
       }
     }
@@ -1848,7 +1852,6 @@ app.get("/docentes-mecatronica", async (req, res) => {
     });
   }
 });
-
 
 
 app.use('/uploads', express.static(UPLOADS_DIR));
