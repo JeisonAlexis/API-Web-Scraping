@@ -1879,6 +1879,57 @@ app.get("/docentes-mecatronica", async (req, res) => {
 });
 
 
+app.get('/laboratorios-mecatronica', async (req, res) => {
+    try {
+        const url = 'https://www.unipamplona.edu.co/unipamplona/portalIG/home_136/recursos/general/22092015/laboratorios.jsp';
+
+        const { data: html } = await axios.get(url);
+
+        const $ = cheerio.load(html);
+
+        const laboratorios = [];
+
+        $('div#texto table tbody tr').each((index, row) => {
+            const celdas = $(row).find('td');
+            if (celdas.length === 2) {
+                const nombreCelda = $(celdas[0]);
+                const imagenCelda = $(celdas[1]);
+
+                let nombre = nombreCelda.find('p strong').text().trim();
+                if (!nombre) {
+                    nombre = nombreCelda.text().trim().replace(/\s+/g, ' ').replace(/\n/g, '');
+                }
+
+                let imagenUrl = imagenCelda.find('img').attr('src');
+                if (imagenUrl) {
+                    if (imagenUrl.startsWith('/')) {
+                        const baseUrl = new URL(url);
+                        imagenUrl = `${baseUrl.protocol}//${baseUrl.host}${imagenUrl}`;
+                    }
+                }
+
+                if (nombre && imagenUrl) {
+                    laboratorios.push({ nombre, imagen: imagenUrl });
+                }
+            }
+        });
+
+        res.json({
+            success: true,
+            count: laboratorios.length,
+            laboratorios
+        });
+    } catch (error) {
+        console.error('Error al obtener los laboratorios:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error al recuperar la información de los laboratorios',
+            error: error.message
+        });
+    }
+});
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use((err, req, res, next) => {
