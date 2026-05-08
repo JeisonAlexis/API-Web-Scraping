@@ -1881,46 +1881,83 @@ app.get("/docentes-mecatronica", async (req, res) => {
 
 app.get('/laboratorios-mecatronica', async (req, res) => {
     try {
+        await ensureUploadsDir();
+
         const url = 'https://www.unipamplona.edu.co/unipamplona/portalIG/home_136/recursos/general/22092015/laboratorios.jsp';
 
-        const { data: html } = await axios.get(url);
+        const { data: html } = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+        });
 
         const $ = cheerio.load(html);
-
         const laboratorios = [];
 
-        $('div#texto table tbody tr').each((index, row) => {
+        $('div#texto table tbody tr').each(async (index, row) => {
             const celdas = $(row).find('td');
-            if (celdas.length === 2) {
-                const nombreCelda = $(celdas[0]);
-                const imagenCelda = $(celdas[1]);
+            if (celdas.length !== 2) return;
 
-                let nombre = nombreCelda.find('p strong').text().trim();
-                if (!nombre) {
-                    nombre = nombreCelda.text().trim().replace(/\s+/g, ' ').replace(/\n/g, '');
-                }
+            const nombreCelda = $(celdas[0]);
+            const imagenCelda = $(celdas[1]);
 
-                let imagenUrl = imagenCelda.find('img').attr('src');
-                if (imagenUrl) {
-                    if (imagenUrl.startsWith('/')) {
-                        const baseUrl = new URL(url);
-                        imagenUrl = `${baseUrl.protocol}//${baseUrl.host}${imagenUrl}`;
-                    }
-                }
-
-                if (nombre && imagenUrl) {
-                    laboratorios.push({ nombre, imagen: imagenUrl });
-                }
+            let nombre = nombreCelda.find('p strong').text().trim();
+            if (!nombre) {
+                nombre = nombreCelda.text().trim().replace(/\s+/g, ' ').replace(/\n/g, '');
             }
+            if (!nombre) return;
+
+            let imagenUrl = imagenCelda.find('img').attr('src');
+            if (!imagenUrl) return;
+
+            if (imagenUrl.startsWith('data:image')) {
+                imagenUrl = await guardarImagenBase64(imagenUrl, nombre);
+            } 
+            else if (imagenUrl.startsWith('/')) {
+                const baseUrl = new URL(url);
+                imagenUrl = `${baseUrl.protocol}//${baseUrl.host}${imagenUrl}`;
+            }
+
+            laboratorios.push({ nombre, imagen: imagenUrl });
         });
+
+        const laboratoriosFinal = [];
+        const filas = $('div#texto table tbody tr');
+        for (const row of filas) {
+            const celdas = $(row).find('td');
+            if (celdas.length !== 2) continue;
+
+            const nombreCelda = $(celdas[0]);
+            const imagenCelda = $(celdas[1]);
+
+            let nombre = nombreCelda.find('p strong').text().trim();
+            if (!nombre) {
+                nombre = nombreCelda.text().trim().replace(/\s+/g, ' ').replace(/\n/g, '');
+            }
+            if (!nombre) continue;
+
+            let imagenUrl = imagenCelda.find('img').attr('src');
+            if (!imagenUrl) continue;
+
+            if (imagenUrl.startsWith('data:image')) {
+                imagenUrl = await guardarImagenBase64(imagenUrl, nombre);
+            } else if (imagenUrl.startsWith('/')) {
+                const baseUrl = new URL(url);
+                imagenUrl = `${baseUrl.protocol}//${baseUrl.host}${imagenUrl}`;
+            }
+
+            laboratoriosFinal.push({ nombre, imagen: imagenUrl });
+        }
 
         res.json({
             success: true,
-            count: laboratorios.length,
-            laboratorios
+            fuente: url,
+            totalLaboratorios: laboratoriosFinal.length,
+            laboratorios: laboratoriosFinal
         });
+
     } catch (error) {
-        console.error('Error al obtener los laboratorios:', error.message);
+        console.error('❌ Error al obtener los laboratorios:', error.message);
         res.status(500).json({
             success: false,
             message: 'Error al recuperar la información de los laboratorios',
@@ -1928,7 +1965,6 @@ app.get('/laboratorios-mecatronica', async (req, res) => {
         });
     }
 });
-
 
 app.use('/uploads', express.static(UPLOADS_DIR));
 
